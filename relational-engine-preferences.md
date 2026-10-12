@@ -3,9 +3,9 @@
 ## Constitution Link
 
 The complete [workspace constitution](https://gist.github.com/vex-graph/4132a6c45cb6d3797c3e8eff2e94035a)
-governs this repository. Local workspace path: `../../../preferences.md`.
-Read it first, then this file, `../../../tests/test-preferences.md`, current
-`../../../tests/test-checklist.md`, and the actual implementation.
+governs this repository. Local workspace path: `../../gist/PREFERENCES.md`.
+Read it first, then this file, `../../tests/test-preferences.md`, current
+`../../gist/test-checklist.md`, and the actual implementation.
 
 ## Law Index (Binding Matrix)
 
@@ -48,7 +48,7 @@ Creation/sync/cleanup can block and stay off realtime/bounded-join teardown path
 File/path/length change only through creation/close/transfer, a scoped exception
 under the Conflict Triage Law and Single Class Per File Law (Java Law), not setters
 that forge reservation. Registered real/injected owners under
-`tests/relational-engine/rust/io` prove physical decimal 1 GB reservation, offset
+`../../tests/relational-engine/rust/io` prove physical decimal 1 GB reservation, offset
 bit changes/reopen, rejection/cleanup/retry and descriptor provenance. OS mapping/
 sync/cleanup-error injection, Rust sanitizer, Linux/Windows and macOS14 runtime
 proof remain explicit gaps.
@@ -85,7 +85,7 @@ through admission/access/close, not arbitrary setters, a scoped managed exceptio
 under the Conflict Triage Law and Single Class Per File Law (Java Law).
 
 Registered owners are `mapped_file_test.rs` and `mapping_error_test.rs` under
-`../../../tests/relational-engine/rust/nio`, plus intended unsafe/type/arity/borrow
+`../../tests/relational-engine/rust/nio`, plus intended unsafe/type/arity/borrow
 compiler rejection cases in the main runner. OS mapping/flush/sync-failure injection,
 huge-file admission, Rust sanitizer instrumentation, Windows and macOS 14 runtime proof remain
 explicit gaps, not inferred from a successful local round trip.
@@ -247,9 +247,9 @@ contracts for a future backend; this prototype does not implement them yet.
 
 ## Proof
 
-Owner tests live in the independent `../../../tests/relational-engine` checkout.
-Migrated native IO/NIO owners live in `../../../tests/relational-engine/io` and
-`../../../tests/relational-engine/nio`, including the Rust byte/string handshake.
+Owner tests live in the independent `../../tests/relational-engine` checkout.
+Migrated native IO/NIO owners live in `../../tests/relational-engine/io` and
+`../../tests/relational-engine/nio`, including the Rust byte/string handshake.
 Use registered runners and the Timestamped Test Checklist Law; current platform,
 sanitizer and migration gaps remain explicit, not production readiness.
 

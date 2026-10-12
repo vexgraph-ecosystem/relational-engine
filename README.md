@@ -2,7 +2,7 @@
 R2 memory/storage owner with Rust-owned spans and native C search.
 
 **Ecosystem repository:** https://github.com/vexgraph-ecosystem/relational-engine
-The local checkout is `ecosystem/repos/relational-engine`; its physical location
+The local checkout is ``; its physical location
 does not change its R2 rank. This is a partial backend, not a finished engine.
 
 ## Current State
@@ -30,7 +30,7 @@ does not change its R2 rank. This is a partial backend, not a finished engine.
 existing regular file and fixed read-only/shared writable byte view until close/drop.
 Checked offset/count access, explicit writeback/sync and unsafe external-file
 exclusion have passing macOS arm64 debug/release owners and intended compiler
-rejections through `tests/relational-engine/rust/run.py`. Mapping is not a database
+rejections through `../../tests/relational-engine/rust/run.py`. Mapping is not a database
 transaction or hot arena; the proof gaps below still apply.
 
 **Physical preallocation slice:** Rust `io::PreallocatedFile` creates a new private
@@ -50,7 +50,7 @@ instrumentation is not claimed. `src/relational` and `src/reflection` remain
 imported C comparison material, not production.
 
 **Evidence:** `tests/relational-engine/{native_run.py,rust/run.py}` and
-`tests/test-checklist.md`. The registry C API is
+`../../gist/test-checklist.md`. The registry C API is
 `re_variables_new/drop/add/find/slot/set_pointer`.
 
 ## R2 responsibility split
@@ -108,7 +108,7 @@ files remain comparison material; migrated native IO/NIO is production code.
   `#[intention("...")]`, `#[what("T")]`, `#[checker]`, `#[hotcode]`, `#[debug]`, …);
   `annotation.rs` re-exports them so engine files use `crate::annotation::*`.
   Attributes are compile-time passthroughs (the Two-Semicolon Annotation Style Law).
-- Owner and tooling tests live in the independent workspace `../../../tests/relational-engine`.
+- Owner and tooling tests live in the independent workspace `../../tests/relational-engine`.
 
 The imported C reference retains Vexspoke's Boost Software License in
 `src/LICENSE`; the repository's original MIT license remains at the root.
@@ -158,7 +158,7 @@ unsafe external-file exclusion as ordinary mapping admission.
 space or fail on later edits.** Initial physical reservation is not a forever-space,
 transaction or crash-durability guarantee. Success followed by mapping failure
 leaves the reserved artifact for caller recovery. Real reservation and injected
-stage-failure owners live under `tests/relational-engine/rust/io/`; OS mapping/
+stage-failure owners live under `../../tests/relational-engine/rust/io`; OS mapping/
 sync/cleanup-error injection and other-host runtime proof remain gaps. See
 `rust/README.md` for the Application Support example.
 

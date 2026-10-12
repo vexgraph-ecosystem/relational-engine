@@ -33,9 +33,9 @@ Sugar detects ordinary corruption, not hostile deliberate checksum forgery.
 
 ## Executable scenarios
 
-`tests/relational-engine/nio/mem_test.c` retains the basic public-seam regression
+`../../../tests/relational-engine/nio/mem_test.c` retains the basic public-seam regression
 and now checks every copied byte instead of only byte zero.
-`tests/relational-engine/nio/mem_exhaustion_test.c` supplements it with:
+`../../../tests/relational-engine/nio/mem_exhaustion_test.c` supplements it with:
 
 | Factor | Implemented test |
 | :--- | :--- |
@@ -61,7 +61,7 @@ python3 tests/relational-engine/native_run.py --owner mem_exhaustion_test --mode
 
 The main runner covers optimized strict, release-like (no DEBUG_BORROW_CHECK)
 and ASan/UBSan builds with assertions enabled. Exact commands/results/hashes live
-in `tests/test-checklist.md`; a runner's presence is not execution evidence.
+in `../../../gist/test-checklist.md`; a runner's presence is not execution evidence.
 
 ## Not yet proved
 

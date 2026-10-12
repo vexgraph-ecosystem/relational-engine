@@ -338,7 +338,7 @@ the caller still prevents external mutation/truncation. No resize, mapped C ABI,
 database transaction or crash-durability claim follows. Broader planned areas
 remain unimplemented unless established by their own source and owner proof.
 
-**Evidence boundary:** `tests/relational-engine/rust/run.py` exercises registered
+**Evidence boundary:** `../../../tests/relational-engine/rust/run.py` exercises registered
 debug/release owners, real C clients and C-side ASan/UBSan. C-client ASan/UBSan does
 not instrument Rust. The separate Rust sanitizer runner skips on this host: the
 installed Apple runtime lacks Rust's ASan v8 version symbol. Windows execution,

@@ -10,4 +10,4 @@ output changes only on a match. Keys are raw bytes; Rust owns name grammar/foldi
 Non-null spans must be valid/live; arbitrary-address rejection is not promised.
 Existing `src/relational/` and
 other imported C directories remain comparison material, not the new runtime.
-Owner tests mirror this directory under `../../../../../../tests/relational-engine/search/primitives`.
+Owner tests mirror this directory under `../../../../../tests/relational-engine/search/primitives`.
