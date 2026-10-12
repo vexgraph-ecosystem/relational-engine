@@ -33,7 +33,7 @@ The relational engine is the ecosystem's **memory and storage owner**: it holds
 values and offers stable-row storage plus optional **name-to-pointer bindings**.
 Not every allocation is named, and address stability has an owner lifetime.
 
-It sits at **R2** (the second tier of the R1–R5 stack). It does not own windows,
+It sits at **R2** (the second tier of the R1–R6 stack). It does not own windows,
 GPUs, or UI. It owns: allocation, files, stable rows, named bindings, the shared
 type-id algebra, and native search over rows.
 
@@ -425,7 +425,7 @@ record verbatim would save a process address, not a portable health value.
 
 ## 11. Glossary
 
-- **R1–R5** — the five supervision tiers (host → storage → drivers → UI → apps).
+- **R1–R6** — the six supervision tiers (host → storage → drivers → UI → apps → superapps).
 - **ABI** — the binary contract two languages share: layout, calling convention,
   names.
 - **`repr(C)`** — "lay this out exactly like C would".
