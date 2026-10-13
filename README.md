@@ -94,7 +94,7 @@ compile error, and the owner suite proves that with compile-negative cases, not
 prose: `E0502` borrow rejection, storage arity/type rejection, and
 mapping move/close/write/drop rejection.
 
-**Why not all Rust?** Four reasons, in order of weight:
+**Why not all Rust?** Four technical reasons, in order of weight — and one of intent:
 
 1. **The ABI break.** Every C consumer above links the current ABI; a Rust rewrite
    of it lands as one simultaneous, unprovable change across the ecosystem.
