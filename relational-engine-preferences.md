@@ -91,6 +91,15 @@ compiler rejection cases in the main runner. OS mapping/flush/sync-failure injec
 huge-file admission, Rust sanitizer instrumentation, Windows and macOS 14 runtime proof remain
 explicit gaps, not inferred from a successful local round trip.
 
+8. **C reaches the mapping through ONE thin extern-C ABI, never a second implementation.**
+The mapping is owned in Rust (`ui`/`nio/fixed_mapped_file.rs`); C consumes it through a
+hand-written `extern "C"` surface and the canonical C header, following the engine's
+existing Rust/FFI policy: explicit status codes as the observable failure channel,
+borrowed byte views read-only and bounded by the committed length, no escaped
+descriptor, no C/Rust atomic or layout assumptions. A real C client in the owner tests
+proves the handshake in both debug and release; a C mapping implementation of its own is
+a defect, not an alternative (the Vertical Integration Law).
+
 ### Growable File Mapping Law
 
 #### Definition:

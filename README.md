@@ -107,6 +107,7 @@ mapping move/close/write/drop rejection.
 4. **Progressive proof.** Each step of the migration is proved in *both* languages:
    a real C client compiles against the engine-owned header and runs the
    Rust-owned behavior. A big-bang rewrite has no such intermediate state.
+5. Intentional: I dont believe in **RIIR** sorry not sorry!!!!
 
 **Why not all C?** Because the mapping and typed-storage layer is exactly where
 `unsafe` lives. C can express the same rules, but only by convention and review;

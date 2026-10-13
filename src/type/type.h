@@ -64,7 +64,7 @@
 #define FORM_STRUCT_COEXISTENT  0x9'00'0'0'0'0000'000000ULL
 
 // Project byte: which repo owns the class. 256 projects fit the same stack.
-#define PROJ_GENERIC             0x0'00'0'0'0'0000'000000ULL  // zero
+#define PROJ_GENERIC             0x0'00'0'0'0'0000'000000ULL  // zero lol
 #define PROJ_VEXSPOKE            0x0'01'0'0'0'0000'000000ULL
 #define PROJ_GRAPHVEX            0x0'02'0'0'0'0000'000000ULL
 #define PROJ_HOTCWAP             0x0'03'0'0'0'0000'000000ULL
