@@ -8,10 +8,12 @@
 //! Registration/destruction require exclusion of readers. Set is cold/allocation-
 //! bearing. Get is one acquire load, no allocation/log/lock. Arbitrary Bytes allowed.
 
+use crate::annotation::overview;
 use std::sync::{Mutex, atomic::{AtomicPtr, Ordering}};
 use crate::MemoryError;
 use super::{history::History, snapshot::Snapshot};
 
+#[overview]
 pub struct AtomicString {
     current: AtomicPtr<Snapshot>,
     history: Mutex<History>,

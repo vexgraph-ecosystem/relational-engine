@@ -330,8 +330,8 @@ Rust memory bridge, registry and typed-handle implementations. Other native IO
 owners need their own current proof; this document does not certify the whole
 family or clipboard behavior.
 
-**Mapping status:** `rust/src/nio/mapped_file.rs` now owns fixed-extent regular-file
-byte views through memmap2. `mapped_file_test.rs` and `mapping_error_test.rs` pass
+**Mapping status:** `rust/src/nio/fixed_mapped_file.rs` now owns fixed-extent regular-file
+byte views through memmap2. `fixed_mapped_file_test.rs` and `mapping_error_test.rs` pass
 on macOS arm64 in debug/release, with intended unsafe/arity/type/borrow compiler
 rejections in the registered runner. Rust lifetimes protect our own borrowers;
 the caller still prevents external mutation/truncation. No resize, mapped C ABI,
@@ -365,7 +365,7 @@ Honest pressure points, so you can push on them:
 4. **One header, one truth.** The 16-byte block header lives with the allocator; the
    type algebra lives in `src/type`. They are related but separate — worth deciding
    whether the header should carry more self-description.
-5. **Mapping is a choice, not a readiness badge.** Rust MappedFile now implements
+5. **Mapping is a choice, not a readiness badge.** Rust FixedMappedFile now implements
    fixed-extent regular-file bytes with checked offset/count access. Unsafe open
    requires external mutation/truncation exclusion; borrowing protects only our
    own view lifetime. Application owners may keep the mapping until shutdown.
@@ -387,7 +387,7 @@ Honest pressure points, so you can push on them:
     and teardown. Cold formatting may still abort on OOM; no panic catcher exists.
     Generic Rust pools do not automatically become a generic C allocator.
 4. **Add file-backed storage if that consumer needs it — first primitive implemented.**
-   Fixed-extent Rust MappedFile does not replace pools or implement a database.
+   Fixed-extent Rust FixedMappedFile does not replace pools or implement a database.
    Resize, mapped C ABI, hostile-file exclusion enforcement and crash durability
    are not offered. OS mapping/flush/sync failure injection, huge-file admission
    and platform proof remain gaps.

@@ -8,6 +8,7 @@
 //! Invalid setters preserve old state. Null value pointer means unbound and is legal.
 //! Target lifetime/type/synchronization belong to its owner. Copying/moving a slot
 //! does not change ownership. This initial plain pointer is not atomically replaced.
+use crate::annotation::overview;
 use crate::nio::{storage_error::StorageError, projection};
 
 pub const VARIABLE_NAME_BYTES: usize = 24;
@@ -15,6 +16,7 @@ pub const VARIABLE_NAME_MAX: usize = VARIABLE_NAME_BYTES - 1;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[overview]
 pub struct VariableSlot {
     name: [u8; VARIABLE_NAME_BYTES],
     pointer: *const u8,

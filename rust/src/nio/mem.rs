@@ -7,11 +7,13 @@
 //! Registration/release/clear need exclusive ownership; atomic get/set share &self.
 //! Rejection preserves content. Kind tags are internal, NOT ecosystem type IDs.
 //! Atomic Bytes publish with release/acquire. Strings retain immutable snapshots.
+use crate::annotation::overview;
 use std::sync::atomic::{AtomicU8, Ordering};
 use crate::primitives::atomic_string::AtomicString;
 pub use super::memory_error::MemoryError;
 use super::{block::Block, value::Value};
 
+#[overview]
 pub struct Memory { blocks: Vec<Block>, next_id: u64 }
 
 impl Default for Memory {

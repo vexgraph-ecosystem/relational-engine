@@ -26,7 +26,7 @@ does not change its R2 rank. This is a partial backend, not a finished engine.
   (`Type_registerParents`, `Type_registerBareParents`, `Type_getParentClass`,
   bounded `Type_isA`).
 
-**Implemented mapping slice:** Rust `nio::mapped_file::MappedFile` retains an
+**Implemented mapping slice:** Rust `nio::fixed_mapped_file::FixedMappedFile` retains an
 existing regular file and fixed read-only/shared writable byte view until close/drop.
 Checked offset/count access, explicit writeback/sync and unsafe external-file
 exclusion have passing macOS arm64 debug/release owners and intended compiler
@@ -35,7 +35,7 @@ transaction or hot arena; the proof gaps below still apply.
 
 **Physical preallocation slice:** Rust `io::PreallocatedFile` creates a new private
 file, reserves its requested disk extent and checks allocated OS blocks. No sparse
-fallback. `MappedFile::from_preallocated` consumes the original handle for writable
+fallback. `FixedMappedFile::from_preallocated` consumes the original handle for writable
 offset access. Real macOS arm64 owners cover decimal 1 GB reservation, persisted
 bit changes and failure cleanup/retry. Linux source exists but is unproven;
 Windows explicitly returns Unsupported.
@@ -70,6 +70,58 @@ staged. R3 may borrow either R2 public contract. R1 owns
 lifetimes/residency and excludes active users before destruction. GPU shaders,
 dispatch, capabilities and synchronization remain Graphvex R3. No C/Rust
 atomic-layout compatibility or automatic record-schema migration is assumed.
+
+## Why C and Rust coexist
+
+This is a boundary decision, not a taste one — and it is the question every reader
+asks, so it is answered here once.
+
+**The ABI is already C, and it is wide.** `Memory_*`, `File`, `VexHome`, the 16-byte
+block header, the project-scoped type algebra and the legacy per-project type ids are
+consumed by *every* tier: R1 `hotcwap`, the R3 drivers, R4 interfaces and R5 apps all
+link the C ABI. The constitution is explicit that native allocation semantics and the
+existing type ids are **preserved, not rewritten**, and that this migration is *not* a
+Rust allocator rewrite. Rewriting the ABI in one step would invalidate the whole
+ecosystem at once, in the wrong dependency order.
+
+**Rust is used where the boundary is thinnest and C's cost is highest:**
+typed storage (aligned chunks, typed pools, generation-tagged handles), byte/string
+values with atomic publication, and file-backed mappings. These are the places with
+pointer arithmetic, lifetime reasoning and *unsafe external admission* — a mutable
+file another process may truncate. Rust's ownership system turns
+use-after-free, aliasing and "remap while borrowed" from a runtime hope into a
+compile error, and the owner suite proves that with compile-negative cases, not
+prose: `E0502` borrow rejection, storage arity/type rejection, and
+mapping move/close/write/drop rejection.
+
+**Why not all Rust?** Four reasons, in order of weight:
+
+1. **The ABI break.** Every C consumer above links the current ABI; a Rust rewrite
+   of it lands as one simultaneous, unprovable change across the ecosystem.
+2. **No runtime forced on the floor.** R1 and the R3 drivers stay lean and
+   predictable; a general-purpose allocator, panic machinery or a runtime is not
+   something a host or a driver should inherit.
+3. **The hot path wants an arena.** The laws require zero steady-state allocation
+   and bounded waits. An arena with explicit lifetimes serves that better than a
+   general allocator — and the arena implementation stays C.
+4. **Progressive proof.** Each step of the migration is proved in *both* languages:
+   a real C client compiles against the engine-owned header and runs the
+   Rust-owned behavior. A big-bang rewrite has no such intermediate state.
+
+**Why not all C?** Because the mapping and typed-storage layer is exactly where
+`unsafe` lives. C can express the same rules, but only by convention and review;
+Rust enforces the view-versus-close/write/drop ordering at compile time and makes the
+owner's `Drop` order explicit (`views before file`). That enforcement is the reason
+those files are Rust.
+
+**What it costs, honestly.** Two toolchains (`Cargo` and `b`), a hand-written extern
+boundary, and two rules that must never be relaxed: C calls the canonical engine C ABI
+and **never** casts Rust atomics to C `_Atomic`, and no C/Rust atomic-layout
+compatibility is assumed. Both are stated in the lawbook and both are covered by the
+C-ABI and extern-handshake rows in the owner suite.
+
+**The rule that keeps it honest: C owns the stable ABI; Rust owns new typed storage
+behind it.** Migration is progressive and each step is proved on both sides.
 
 ## Starting point: two interpretations
 
@@ -150,7 +202,7 @@ Applications can choose
 `~/Library/Application Support/vexgraph/<app>/storage.bin`, reserve 1,000,000,000
 bytes (decimal 1 GB), and retain the mapping until shutdown. The file exists in
 Finder; mmap does not make the entire GB resident RAM. Checked offset writes and
-bit changes use the same fixed extent. `MappedFile::from_preallocated(owner)`
+bit changes use the same fixed extent. `FixedMappedFile::from_preallocated(owner)`
 consumes the original descriptor without reopening its path, requiring the same
 unsafe external-file exclusion as ordinary mapping admission.
 
@@ -162,10 +214,10 @@ stage-failure owners live under `../../tests/relational-engine/rust/io`; OS mapp
 sync/cleanup-error injection and other-host runtime proof remain gaps. See
 `rust/README.md` for the Application Support example.
 
-`MappedFile!(path)` opens read-only; `MappedFile!(path, true)` opens shared
+`FixedMappedFile!(path)` opens read-only; `FixedMappedFile!(path, true)` opens shared
 read/write. Both require an explicit unsafe block: the caller must prevent other
 access that mutates/truncates the file or violates writable exclusivity until
-close/drop. `MappedFile!()` creates a safe closed owner. Empty files are admitted
+close/drop. `FixedMappedFile!()` creates a safe closed owner. Empty files are admitted
 without an OS mapping. Admission never creates, truncates or resizes a file.
 
 The application may retain this owner for its lifetime and use
@@ -183,7 +235,7 @@ OS semantics: the API is not path confinement, and read-only mode alone does not
 protect against external truncation. Untrusted mutable files need snapshot/copy
 or genuinely enforced exclusive ownership before mapping.
 
-Owner proof: `tests/relational-engine/rust/nio/{mapped_file,mapping_error}_test.rs`
+Owner proof: `tests/relational-engine/rust/nio/{fixed_mapped_file,mapping_error}_test.rs`
 and unsafe/borrow/type/arity negatives in `rust/run.py`. OS mapping/flush/sync
 failure injection, huge-file admission, crash durability, Rust sanitizer instrumentation,
 Windows and macOS 14 runtime compatibility remain unproved.

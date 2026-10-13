@@ -9,13 +9,13 @@ handles have macOS arm64 debug/release Rust owners and real C-client proof throu
 compatible runtime; Windows, macOS 14 runtime compatibility, performance and
 downstream R3–R5 migration remain unproved.
 
-`nio::mapped_file::MappedFile` now owns fixed-extent existing regular-file byte
+`nio::fixed_mapped_file::FixedMappedFile` now owns fixed-extent existing regular-file byte
 views through memmap2. Offset/count access, exclusive writes, explicit sync and
 borrow-negative owners pass macOS arm64 debug/release; unsafe admission requires preventing
 external file mutation/truncation for the lifetime. No resize or mapped C ABI.
 
 `io::PreallocatedFile` creates new physically reserved byte files without sparse
-fallback and transfers the retained descriptor into `MappedFile`. macOS arm64
+fallback and transfers the retained descriptor into `FixedMappedFile`. macOS arm64
 owners cover decimal 1 GB and persisted offset bit changes. Linux allocation source
 is unproven; Windows rejects Unsupported. APFS COW can still require more space.
 
@@ -43,7 +43,7 @@ means a method is callable; it does not declare another class.
 Relational-engine is an R2 backend alongside Vexspoke. Existing memory/string/FFI
 and stable row/binding code is implemented; other modules retain explicit planned scope:
 
-- `src/nio`: memory, stable typed Chunk and fixed-extent `mapped_file.rs` mmap;
+- `src/nio`: memory, stable typed Chunk and fixed-extent `fixed_mapped_file.rs` mmap;
   mapping resize/C ABI and broader foreign-storage APIs remain planned.
 - `src/io`: implemented create-new physical preallocation; buffered readers/writers, gathering, FFF-style
   indexing/search and watching (planned). Manifest-backed persistent objects are
@@ -163,7 +163,7 @@ Rust sanitizer instrumentation and other-host execution remain gaps.
 #### Create and reserve before mapping
 
 ```rust,no_run
-use relational_engine_scratchpad::{PreallocatedFile, MappedFile};
+use relational_engine_scratchpad::{PreallocatedFile, FixedMappedFile};
 const ONE_GIGABYTE: u64 = 1_000_000_000; // decimal GB, not 1 GiB
 let home = std::env::var_os("HOME").ok_or("HOME is unavailable")?;
 let parent = std::path::PathBuf::from(home)
@@ -175,7 +175,7 @@ let owner = PreallocatedFile!(parent.join("storage.bin"), ONE_GIGABYTE)?;
 assert!(owner.allocated_bytes()? >= ONE_GIGABYTE);
 // SAFETY: host excludes external mutation/truncation/conflicting aliases until
 // close/drop. Retaining the original descriptor prevents path-reopen redirection.
-let mut file = unsafe { MappedFile::from_preallocated(owner)? };
+let mut file = unsafe { FixedMappedFile::from_preallocated(owner)? };
 file.as_mut_slice()?[123] ^= 1; // flip a bit inside the reserved file
 file.sync()?;
 file.close(); // file remains on disk; no implicit sync or deletion
@@ -184,7 +184,7 @@ file.close(); // file remains on disk; no implicit sync or deletion
 
 The caller chooses path and size; tests create no real Application Support file.
 Create-new rejects existing files/final symlinks unchanged; reopen existing storage
-through `MappedFile` instead. `PreallocatedFile!()` is closed. Parents must exist.
+through `FixedMappedFile` instead. `PreallocatedFile!()` is closed. Parents must exist.
 macOS reserves with F_ALLOCATEALL then sets EOF; Linux uses kernel fallocate.
 Allocated OS blocks must cover the requested extent. Unsupported hosts/filesystems
 and insufficient space return inspectable errors, never sparse sizing. Creation-
@@ -201,10 +201,10 @@ OS mapping/sync/cleanup-error injection, Rust instrumentation, Linux/Windows and
 macOS14 runtime proof remain gaps.
 
 ```rust,no_run
-use relational_engine_scratchpad::MappedFile;
+use relational_engine_scratchpad::FixedMappedFile;
 // SAFETY: the application exclusively owns this existing file and prevents
 // external mutation/truncation and conflicting views until mapping close/drop.
-let mut file = unsafe { MappedFile!("private-store.bin", true)? };
+let mut file = unsafe { FixedMappedFile!("private-store.bin", true)? };
 file.write(8, &[1, 2, 3, 4])?; // checked extent; never silently grows the file
 let value_bytes = file.read(8, 4)?;
 assert_eq!(value_bytes, &[1, 2, 3, 4]);
@@ -213,7 +213,7 @@ file.close(); // no implicit sync; all views must stop being used first
 # Ok::<(), relational_engine_scratchpad::MappingError>(())
 ```
 
-`MappedFile!()`/`zero()` yield a closed empty owner; `new(path)` and the one-argument
+`FixedMappedFile!()`/`zero()` yield a closed empty owner; `new(path)` and the one-argument
 macro admit read-only views. `open(path, writable)` and the two-argument macro
 choose access mode. `as_slice` yields empty bytes for closed/empty owners;
 `as_mut_slice`, checked `read`/`write`, `flush` and `sync` return MappingError on

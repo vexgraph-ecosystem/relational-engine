@@ -29,7 +29,7 @@ pub use nio::mem;
 pub use primitives::string;
 pub use nio::mem::Memory;
 pub use nio::memory_error::MemoryError;
-pub use nio::mapped_file::MappedFile;
+pub use nio::fixed_mapped_file::FixedMappedFile;
 pub use nio::mapping_error::MappingError;
 pub use io::preallocated_file::PreallocatedFile;
 pub use io::preallocation_error::PreallocationError;

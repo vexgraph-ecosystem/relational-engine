@@ -17,6 +17,7 @@
 //! Generation zero is never issued. Removing the last permitted generation retires
 //! the slot permanently instead of wrapping. Empty backing release retains identity
 //! metadata; raw indices remain reusable and handles do not identify another owner.
+use crate::annotation::overview;
 use super::handle::Handle;
 use super::{projection, storage_error::StorageError};
 use std::mem::MaybeUninit;
@@ -26,6 +27,7 @@ pub const TYPED_CHUNK_ROWS_DEFAULT: usize = 1024;
 // A bitmap word has exactly this many bits by its u64 representation.
 const BITMAP_WORD_BITS: usize = u64::BITS as usize;
 
+#[overview]
 pub struct TypedChunk<T> {
     rows: Vec<MaybeUninit<T>>,  // fixed allocation of `capacity` slot rows, uninit until written
     occupied: Vec<u64>,         // packed occupancy bitmap: one bit per row slot

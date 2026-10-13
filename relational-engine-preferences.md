@@ -17,7 +17,8 @@ Read it first, then this file, `../../tests/test-preferences.md`, current
 | CamelCase Rust Constructor Macro Law | Rust construction spelling | CamelCase!() macros; snake_case ordinary operations |
 | R2 Responsibility Layout Law | Rust storage and C search | Module/layout owner checks; explicit unimplemented scope |
 | Stable Row and Variable Binding Law | Chunk/registry lifetimes and 32-byte ABI | Growth, layout, failure and C-client owner tests |
-| Fixed-Extent File Mapping Law | Rust file-backed byte views and lifetime | Unsafe external-file admission, checked ranges, borrow-negative and real file owners |
+| Fixed File Mapping Law | Rust fixed-extent file-backed byte views and lifetime | Unsafe external-file admission, checked ranges, borrow-negative and real file owners |
+| Growable File Mapping Law | Rust reservation-backed growing byte views | Specified, not implemented; growth/publication/free-list rules below |
 | Physical File Reservation Law | Rust create-new byte files | Real allocated-block proof, no sparse fallback, failure preservation and retained-descriptor transfer |
 
 ### Physical File Reservation Law
@@ -37,7 +38,7 @@ both errors. This stable-parent contract is not a hostile-directory sandbox or
 TOCTOU defence; ancestor symlinks, same-user and privileged actors are not excluded.
 Drop/close retains successful files.
 
-`MappedFile::from_preallocated` consumes the original descriptor, never reopening
+`FixedMappedFile::from_preallocated` consumes the original descriptor, never reopening
 the pathname; its unsafe external-file exclusion still applies. Mapping failure
 retains the reserved artifact for explicit recovery. References remain file
 identity plus offsets. No resize, format, checksums, transaction or persistence
@@ -53,9 +54,9 @@ bit changes/reopen, rejection/cleanup/retry and descriptor provenance. OS mappin
 sync/cleanup-error injection, Rust sanitizer, Linux/Windows and macOS14 runtime
 proof remain explicit gaps.
 
-### Fixed-Extent File Mapping Law
+### Fixed File Mapping Law
 
-Rust `nio/mapped_file.rs` owns `MappedFile`, a fixed-extent existing regular-file
+Rust `nio/fixed_mapped_file.rs` owns `FixedMappedFile`, a fixed-extent existing regular-file
 mapping through memmap2. The owner retains the file until close/drop and unmaps
 before releasing it. Read-only and shared read/write modes are explicit; empty
 files are valid open owners without an OS mapping. No implicit create/truncate/resize,
@@ -84,11 +85,56 @@ off realtime and bounded-join teardown paths. Geometry/mode/backing mutate only
 through admission/access/close, not arbitrary setters, a scoped managed exception
 under the Conflict Triage Law and Single Class Per File Law (Java Law).
 
-Registered owners are `mapped_file_test.rs` and `mapping_error_test.rs` under
+Registered owners are `fixed_mapped_file_test.rs` and `mapping_error_test.rs` under
 `../../tests/relational-engine/rust/nio`, plus intended unsafe/type/arity/borrow
 compiler rejection cases in the main runner. OS mapping/flush/sync-failure injection,
 huge-file admission, Rust sanitizer instrumentation, Windows and macOS 14 runtime proof remain
 explicit gaps, not inferred from a successful local round trip.
+
+### Growable File Mapping Law
+
+#### Definition:
+`GrowableMappedFile` (Rust `nio/`) owns a **fixed virtual RESERVATION** over a file it
+creates and owns, plus a **committed length** that grows inside that reservation. The
+mapping is created once and never re-created, so every pointer handed out before a
+growth step remains valid after it. That stability — not the growth itself — is the
+entire reason this is a separate type from `FixedMappedFile`, which views an existing
+file at a length that cannot change and may be read-only.
+
+#### The Why:
+The store needs one file that grows: darkbase's `.vexdb`. On macOS there is no
+`mremap`, so re-mapping a grown file may return a different base address and
+invalidate every live pointer — the exact failure this type exists to prevent. A
+reservation costs nothing on 64-bit because it is **virtual** address space, not RAM:
+a mapping may comfortably exceed physical memory and still work, because its pages are
+backed by the file, paged in on demand. Reserved virtual space can be enormous;
+resident bytes are bounded by RAM plus the file's allocated blocks. That distinction
+must be stated wherever this type is described.
+
+#### The Rule:
+1. **Reservation is fixed at create**, chosen by the caller, and the mapping is made
+   once. Growing the reservation itself is not offered: on macOS it would need a new
+   mapping and could move the base.
+2. **Sparse growth by step.** The committed length grows in caller-sized steps and
+   only the step's blocks are allocated — never the whole reservation up front, so
+   create stays cheap and `grow_to` stays meaningful.
+3. **Allocate before publishing.** Blocks for the step are reserved first, and only
+   then is the committed length raised. A failed growth leaves the length unchanged
+   and every byte preserved; there is no half-grown state.
+4. **Never expose past committed.** Byte access is bounded by the committed length,
+   never by the reservation. Mapping longer than the file is legal; *touching* past
+   EOF faults (SIGBUS). This is the type's most important line.
+5. **Released ranges are reused.** A free list of emptied page ranges (the caller's
+   list, or a sibling owner) lets the committed length plateau instead of ratcheting
+   to a permanent high-water mark. Reuse is explicit, never implicit compaction.
+6. **Always read/write.** There is no read-only form: growth requires write access.
+7. **Same exclusions as `FixedMappedFile`:** no file format, no transaction, no
+   implicit sync (flush/sync stay explicit caller decisions), no typed
+   reinterpretation, no concurrent writers, and page faults are unbounded waits that
+   must stay off joined-worker bounded-teardown paths (the Bounded Wait Law).
+8. **Status: specified, not implemented.** No `GrowableMappedFile` source exists yet.
+   Until it does, no store may claim a growable mapping primitive; `FixedMappedFile`
+   is the only implemented mapping type and it cannot grow.
 
 ### Stable Row and Variable Binding Law
 
@@ -147,7 +193,7 @@ distinct API, not a silent allocator substitution. Native code may borrow
 Vexspoke CPU-only spin/crypto/type/annotation contracts; never downstream or
 host headers, duplicate memory implementations or a recursive target graph.
 Rust `nio/` owns buffers, heap/foreign storage and fixed-extent file-backed mappings
-(`MappedFile`/mmap); `io/` owns future buffered readers/writers,
+(`FixedMappedFile`/mmap); `io/` owns future buffered readers/writers,
 gathering, indexing and watching. Manifest-backed persistence remains proposed;
 no concurrent file-commit/durability contract is implemented or implied.
 FFF means the file-search toolkit at https://github.com/dmtrKovalenko/fff,

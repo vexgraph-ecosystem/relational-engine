@@ -10,8 +10,10 @@
 //! preserves initialized rows and len (private directory capacity may increase).
 //! Rejected add drops the supplied value. No removal, reuse, arbitrary address
 //! validation, lock-free publication, whole-list contiguous slice or GPU storage.
+use crate::annotation::overview;
 use crate::nio::{chunk::{Chunk, CHUNK_ROWS_DEFAULT}, storage_error::StorageError, projection};
 
+#[overview]
 pub struct ChunkedList<T> {
     chunks: Vec<Chunk<T>>,
     rows_per_chunk: usize,

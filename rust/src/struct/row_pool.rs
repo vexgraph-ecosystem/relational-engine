@@ -7,6 +7,7 @@
 //! Owner IDs are process-local, issued cold without wrap; resident engine required.
 //! Rejection preserves live bytes/identities; private capacity/backing may grow.
 //! External C pointers require exclusion before mutation/removal/destruction.
+use crate::annotation::overview;
 use crate::nio::{handle::Handle, row_chunk::RowChunk, row_handle::RowHandle,
     storage_error::StorageError, typed_chunk::TYPED_CHUNK_ROWS_DEFAULT, projection};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,6 +18,7 @@ const OWNERSHIP_CONTRACT: () = ();
 // Never reuse an owner ID in the resident engine; exhaustion rejects construction.
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 
+#[overview]
 pub struct RowPool {
     chunks: Vec<RowChunk>,  // directory may move; byte backing and identity history do not
     row_size: usize,       // exact visible row bytes, immutable

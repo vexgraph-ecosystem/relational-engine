@@ -3,10 +3,12 @@
 //! Zero is invalid. owner distinguishes pools, including after destruction/recreation.
 //! API: new/zero/owner/index/generation/is_zero/to_string/to_string_struct.
 //! reserved must be zero. This record is not a pointer, ecosystem type ID or disk ID.
+use crate::annotation::overview;
 use super::projection;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[overview]
 pub struct RowHandle {
     owner: u64,       // resident engine-issued pool identity, never reused in this process
     index: usize,     // pool-local location

@@ -8,11 +8,13 @@
 //! incoming T but preserves existing rows. Allocation failure returns Allocation;
 //! allocator abort policies elsewhere are not changed. Mutation requires &mut self.
 //! Raw addresses borrowed from rows survive append/header moves but not owner drop.
+use crate::annotation::overview;
 use super::{storage_error::StorageError, projection};
 
 /// Named initial row capacity, not a collection-wide ceiling.
 pub const CHUNK_ROWS_DEFAULT: usize = 64;
 
+#[overview]
 pub struct Chunk<T> {
     rows: Vec<T>,
     capacity: usize,

@@ -7,10 +7,12 @@
 //! OVERVIEW: #[repr(C)] Handle { index: usize, generation: u32 }.
 //! API: new/zero/index/generation/is_zero/to_string/to_string_struct.
 //! No owning class here; the owning TypedChunk/TypedPool validates the handle.
+use crate::annotation::overview;
 use super::projection;
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[overview]
 pub struct Handle {
     index: usize,      // pool-local slot location (the same index the raw API uses)
     generation: u32,   // slot generation captured at issue; distinguishes a later reuse

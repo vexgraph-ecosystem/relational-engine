@@ -7,9 +7,11 @@
 //! release_empty/has_backing/is_full/is_empty/to_string/to_string_struct. Drop frees
 //! backing. Empty backing release retains slot history. All mutation is exclusive;
 //! escaped pointers expire on removal/destruction and require external exclusion.
+use crate::annotation::overview;
 use super::{handle::Handle, projection, storage_error::StorageError, typed_chunk::TypedChunk};
 use std::{alloc::{alloc_zeroed, dealloc, Layout}, ptr::NonNull};
 
+#[overview]
 pub struct RowChunk {
     data: Option<NonNull<u8>>, // aligned flat row bytes; None after empty backing release
     layout: Layout,           // validated allocation size/alignment, immutable

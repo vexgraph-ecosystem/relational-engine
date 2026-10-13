@@ -6,7 +6,7 @@
 //! OVERVIEW: file Option<File> (retained handle), path Option<PathBuf> (selected
 //! path), length u64 (immutable logical extent). Public: zero/new; len/is_empty/
 //! is_open/path/allocated_bytes/sync/close; bounded projections; PreallocatedFile!.
-//! Crate-private into_file transfers the SAME descriptor to MappedFile, never
+//! Crate-private into_file transfers the SAME descriptor to FixedMappedFile, never
 //! reopening the pathname. Drop closes but does not delete/sync a successful file.
 //! Validation precedes creation. Reservation/EOF/allocation-query failures close
 //! and remove only the newly created path under the stable-parent contract. Cleanup

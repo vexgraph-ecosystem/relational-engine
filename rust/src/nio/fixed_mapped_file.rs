@@ -1,4 +1,4 @@
-//! DEFINITION: MappedFile owns a fixed-extent regular-file byte mapping and its file.
+//! DEFINITION: FixedMappedFile owns a fixed-extent regular-file byte mapping and its file.
 //! This is cold R2 storage, not a native Memory block, typed-row allocation, database
 //! format or transaction. memmap2 owns platform mapping/unmapping. Page faults, open,
 //! flush, sync and cleanup have no guaranteed wall-time bound or realtime suitability.
@@ -7,7 +7,7 @@
 //! Exactly one view exists for a nonempty open file; empty files are open/unmapped.
 //! Fields drop in this order: views before file. No escaped descriptor or resize API.
 //! Public: zero/new/open/from_preallocated; len/is_empty/is_open/is_writable/as_slice/as_mut_slice;
-//! read/write/flush/sync/close; bounded to_string/to_string_struct; MappedFile!().
+//! read/write/flush/sync/close; bounded to_string/to_string_struct; FixedMappedFile!().
 //! Invalid ranges preserve bytes; rejected construction publishes no partial owner.
 //! close is idempotent and does NOT flush; explicit sync is a caller decision.
 //! Rust borrows exclude our own mutation/close while a view is used. Unsafe admission
@@ -22,14 +22,14 @@ use crate::io::preallocated_file::PreallocatedFile;
 #[definition]
 #[overview]
 #[intention("mapping state mutates only through admission/access/close; arbitrary field setters would forge borrow lifetime per the Conflict Triage Law + Single Class Per File Law (Java Law)")]
-pub struct MappedFile {
+pub struct FixedMappedFile {
     read: Option<Mmap>,
     write: Option<MmapMut>,
     file: Option<File>,
     writable: bool,
 }
 
-impl MappedFile {
+impl FixedMappedFile {
     /// Construct an empty closed owner, without opening a file or allocating.
     pub fn zero() -> Self {
         Self { read: None, write: None, file: None, writable: false }
@@ -162,20 +162,20 @@ impl MappedFile {
 
     /// Write a bounded cold summary, reporting truncation; formatting may allocate.
     pub fn to_string(&self, dest: &mut [u8], truncated: &mut bool) -> bool {
-        projection::write(format!("MappedFile(open={}, len={}, writable={})",
+        projection::write(format!("FixedMappedFile(open={}, len={}, writable={})",
             self.is_open(), self.len(), self.is_writable()), dest, truncated)
     }
 
     /// Project own fields in declaration order, without addresses or file contents.
     pub fn to_string_struct(&self, dest: &mut [u8], truncated: &mut bool) -> bool {
-        projection::write(format!("MappedFile {{ read: {}, write: {}, file: {}, writable: {} }}",
+        projection::write(format!("FixedMappedFile {{ read: {}, write: {}, file: {}, writable: {} }}",
             self.read.is_some(), self.write.is_some(), self.is_open(), self.writable), dest, truncated)
     }
 }
 
 #[macro_export]
-macro_rules! MappedFile {
-    () => { $crate::MappedFile::zero() };
-    ($path:expr) => { $crate::MappedFile::new($path) };
-    ($path:expr, $writable:expr) => { $crate::MappedFile::open($path, $writable) };
+macro_rules! FixedMappedFile {
+    () => { $crate::FixedMappedFile::zero() };
+    ($path:expr) => { $crate::FixedMappedFile::new($path) };
+    ($path:expr, $writable:expr) => { $crate::FixedMappedFile::open($path, $writable) };
 }

@@ -9,6 +9,7 @@
 //! A consumer must retain its target, obey its type and synchronize access. Registry
 //! destruction drops labels only. Pointer replacement requires &mut self and caller
 //! exclusion of dereferences through any old pointers, not merely this registry.
+use crate::annotation::overview;
 use crate::{nio::{storage_error::StorageError, projection}, r#struct::chunked_list::ChunkedList};
 use super::variable_slot::{VariableSlot, VARIABLE_NAME_BYTES};
 
@@ -17,6 +18,7 @@ unsafe extern "C" {
                       key: *const u8, key_bytes: usize, out_index: *mut usize) -> i32;
 }
 
+#[overview]
 pub struct VariableRegistry {
     slots: ChunkedList<VariableSlot>,
 }
