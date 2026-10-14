@@ -18,7 +18,7 @@ Read it first, then this file, `../../tests/test-preferences.md`, current
 | R2 Responsibility Layout Law | Rust storage and C search | Module/layout owner checks; explicit unimplemented scope |
 | Stable Row and Variable Binding Law | Chunk/registry lifetimes and 32-byte ABI | Growth, layout, failure and C-client owner tests |
 | Fixed File Mapping Law | Rust fixed-extent file-backed byte views and lifetime | Unsafe external-file admission, checked ranges, borrow-negative and real file owners |
-| Growable File Mapping Law | Rust reservation-backed growing byte views | Implemented with one C ABI; free-list reuse and Windows/Linux proof remain gaps |
+| Growable File Mapping Law | Rust reservation-backed growing byte views | Implemented with one C ABI (create and open); free-list reuse and Windows/Linux proof remain gaps |
 | Physical File Reservation Law | Rust create-new byte files | Real allocated-block proof, no sparse fallback, failure preservation and retained-descriptor transfer |
 
 ### Physical File Reservation Law
@@ -104,8 +104,8 @@ a defect, not an alternative (the Vertical Integration Law).
 
 #### Definition:
 `GrowableMappedFile` (Rust `nio/`) owns a **fixed virtual RESERVATION** over a file it
-creates and owns, plus a **committed length** that grows inside that reservation. The
-mapping is created once and never re-created, so every pointer handed out before a
+creates or reopens, plus a **committed length** that grows inside that reservation. The
+mapping is made once and never re-made, so every pointer handed out before a
 growth step remains valid after it. That stability — not the growth itself — is the
 entire reason this is a separate type from `FixedMappedFile`, which views an existing
 file at a length that cannot change and may be read-only.
@@ -123,13 +123,18 @@ must be stated wherever this type is described.
 #### The Rule:
 1. **Reservation is fixed at create**, chosen by the caller, and the mapping is made
    once. Growing the reservation itself is not offered: on macOS it would need a new
-   mapping and could move the base.
+   mapping and could move the base. **Opening is create's counterpart**, not a second
+   creation: the caller states the same reservation, a file too short to hold it is
+   refused, a missing file is an OS failure rather than a silent create, and opening
+   never resizes, truncates or allocates — this is the store's reopen path.
 2. **Sparse growth by step.** The committed length grows in caller-sized steps and
    only the step's blocks are allocated — never the whole reservation up front, so
    create stays cheap and `grow_to` stays meaningful.
 3. **Allocate before publishing.** Blocks for the step are reserved first, and only
    then is the committed length raised. A failed growth leaves the length unchanged
-   and every byte preserved; there is no half-grown state.
+   and every byte preserved; there is no half-grown state. Growth into blocks the file
+   ALREADY holds reserves nothing and only publishes the length — that is what makes
+   reopening cheap, and it is decided by observed allocation, never by the request.
 4. **Never expose past committed.** Byte access is bounded by the committed length,
    never by the reservation. Mapping longer than the file is legal; *touching* past
    EOF faults (SIGBUS). This is the type's most important line.
@@ -149,6 +154,10 @@ must be stated wherever this type is described.
    is byte-identical after it, bytes survive growth, growth past the reservation and
    backwards growth are refused, and a failed growth leaves both length and bytes
    unchanged. Real allocation is *observed* through `st_blocks`, never assumed.
+   Reopening is proved from both sides — the Rust owner and a real C client of the ABI —
+   including that opening does not resize the file, that a file too short for the
+   reservation and a committed extent the filesystem cannot back are both refused, and
+   that growth back to what the file already holds reserves nothing.
    **Still missing:** the free-list reuse of released ranges (there is no release
    operation yet, so the committed length only ratchets up), and Windows/Linux runtime
    proof — the code path exists and rejects `Unsupported`, but has never run there.
