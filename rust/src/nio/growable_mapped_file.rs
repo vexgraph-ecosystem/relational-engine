@@ -13,7 +13,7 @@
 //! legal, touching past EOF is not.
 //! OVERVIEW: write Option<MmapMut> (the reservation), file Option<File>, reserved
 //! usize, committed usize. Fields drop in this order: view before file.
-//! Public: zero/supported/create; len/reserved/is_empty/is_open/allocated_bytes;
+//! Public: zero/supported/create/open; len/reserved/is_empty/is_open/allocated_bytes;
 //! as_slice/as_mut_slice/read/write; grow_to; flush/sync/close;
 //! bounded to_string/to_string_struct.
 //! No file format, no transaction, no implicit sync, no typed reinterpretation, no
@@ -71,6 +71,53 @@ impl GrowableMappedFile {
             preallocation::reserve(&file, committed).map_err(MappingError::Preallocation)?;
         }
         preallocation::set_length(&file, reserved).map_err(MappingError::Preallocation)?;
+        let length = usize::try_from(reserved).map_err(|_| MappingError::Length)?;
+        // SAFETY: caller supplied the exclusion contract; the file is live and writable.
+        let write = unsafe { MmapOptions::new().len(length).map_mut(&file)? };
+        Ok(Self {
+            write: Some(write),
+            file: Some(file),
+            reserved: length,
+            committed: usize::try_from(committed).map_err(|_| MappingError::Length)?,
+        })
+    }
+
+    /// Open an EXISTING reserved file and map the whole reservation once — the
+    /// counterpart of `create` for a store being *reopened*.
+    ///
+    /// This never creates, resizes or truncates: the reservation was fixed when the
+    /// file was made, so a file shorter than `reserved` is refused rather than mapped
+    /// as something it is not. `committed` is the caller's starting extent and must
+    /// already be backed by allocated blocks, because the whole point of the type is
+    /// that the committed region is physically there; a store opens with one page to
+    /// read its header, then calls `grow_to`, which costs nothing when the blocks
+    /// already exist.
+    ///
+    /// # Safety
+    /// As `create`: the caller must exclude every other writer (and any aliasing
+    /// view) of the file for the owner's whole lifetime.
+    pub unsafe fn open(path: impl AsRef<Path>, reserved: u64, committed: u64) -> Result<Self, MappingError> {
+        if !preallocation::supported() {
+            return Err(MappingError::Preallocation(PreallocationError::Unsupported));
+        }
+        if reserved == 0 || committed > reserved {
+            return Err(MappingError::Bounds);
+        }
+        let file = OpenOptions::new().read(true).write(true).open(path.as_ref())?;
+        if !file.metadata()?.is_file() {
+            return Err(MappingError::NotRegularFile);
+        }
+        if file.metadata()?.len() < reserved {
+            return Err(MappingError::Bounds);
+        }
+        // Never publish a committed region the filesystem cannot actually back.
+        let allocated = preallocation::allocated_bytes(&file).map_err(MappingError::Preallocation)?;
+        if allocated < committed {
+            return Err(MappingError::Preallocation(PreallocationError::Incomplete {
+                requested: committed,
+                allocated,
+            }));
+        }
         let length = usize::try_from(reserved).map_err(|_| MappingError::Length)?;
         // SAFETY: caller supplied the exclusion contract; the file is live and writable.
         let write = unsafe { MmapOptions::new().len(length).map_mut(&file)? };
@@ -152,6 +199,15 @@ impl GrowableMappedFile {
             return Err(MappingError::Bounds);
         }
         if target == self.committed {
+            return Ok(());
+        }
+        // Growth is free when the blocks are already there, which is the reopened
+        // case: opening a store and raising the extent back to what the file already
+        // holds must not reserve a second copy past the physical end. The check is on
+        // OBSERVED allocation, never on the request.
+        let already = preallocation::allocated_bytes(file).map_err(MappingError::Preallocation)?;
+        if already >= target as u64 {
+            self.committed = target;
             return Ok(());
         }
         // Allocate before publishing: reserve the step, then verify the filesystem

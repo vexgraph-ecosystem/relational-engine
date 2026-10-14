@@ -1,7 +1,7 @@
 //! DEFINITION: procedural C adapter for the Rust GrowableMappedFile; declarations in
 //! growable_mapped_file.h. The reservation, the descriptor and the unmapping order
 //! live in Rust; C borrows them and there is no second implementation on the C side.
-//! OVERVIEW: create/drop/len/reserved/is_open/allocated_bytes/read/write/borrow/
+//! OVERVIEW: create/open/drop/len/reserved/is_open/allocated_bytes/read/write/borrow/
 //! grow_to/flush/sync/close and a bounded projection, all re_gmap_* exports. An
 //! integer status is the observable rejection channel (same policy as memory/
 //! registry/row_pool and the fixed mapping ABI).
@@ -52,6 +52,33 @@ pub unsafe extern "C" fn re_gmap_create(path: *const core::ffi::c_char, reserved
     };
     // SAFETY: the caller accepts the writer-exclusion contract documented in the header.
     match unsafe { GrowableMappedFile::create(text, reserved as u64, committed as u64) } {
+        Ok(owner) => {
+            unsafe { *out_owner = Box::into_raw(Box::new(owner)) };
+            GMAP_OK
+        }
+        Err(error) => status(error),
+    }
+}
+
+/// # Safety
+/// `path` is a live NUL-terminated string, `out_owner` is valid write storage, and
+/// the file already exists. Opening a writable mapping requires excluding every
+/// other writer for the owner's whole lifetime — the caller's precondition, not
+/// checked here. This never creates, resizes or truncates the file.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn re_gmap_open(path: *const core::ffi::c_char, reserved: usize,
+                                      committed: usize,
+                                      out_owner: *mut *mut GrowableMappedFile) -> u32 {
+    if path.is_null() || out_owner.is_null() {
+        return GMAP_INVALID;
+    }
+    // SAFETY: caller promises a live NUL-terminated string.
+    let text = match unsafe { core::ffi::CStr::from_ptr(path) }.to_str() {
+        Ok(text) => text,
+        Err(_) => return GMAP_INVALID,
+    };
+    // SAFETY: the caller accepts the writer-exclusion contract documented in the header.
+    match unsafe { GrowableMappedFile::open(text, reserved as u64, committed as u64) } {
         Ok(owner) => {
             unsafe { *out_owner = Box::into_raw(Box::new(owner)) };
             GMAP_OK

@@ -47,6 +47,15 @@ typedef struct ReGrowableMappedFile ReGrowableMappedFile;
  * the mapping is published. */
 uint32_t re_gmap_create(const char *path, size_t reserved, size_t committed,
                         ReGrowableMappedFile **out_owner);
+/* Open an EXISTING reserved file — the counterpart of create, for reopening a store
+ * rather than making one — and map the whole reservation once. Never creates,
+ * resizes or truncates: a missing file is an IO/OS failure and a file shorter than
+ * `reserved` is refused, because the reservation was fixed when the file was made.
+ * `committed` is the caller's starting extent and must already be backed by
+ * allocated blocks; raise it with re_gmap_grow_to, which is free when the blocks
+ * are already there. Returns 3 for a file that cannot hold the reservation. */
+uint32_t re_gmap_open(const char *path, size_t reserved, size_t committed,
+                      ReGrowableMappedFile **out_owner);
 /* Release the owner: unmaps before releasing the file. Null is a quiet no-op. */
 void re_gmap_drop(ReGrowableMappedFile *owner);
 
