@@ -5,4 +5,4 @@
 //! not serialized RAM pointers. Durability and concurrent commits remain unproved.
 pub mod preallocated_file;
 pub mod preallocation_error;
-mod preallocation;
+pub(crate) mod preallocation;
