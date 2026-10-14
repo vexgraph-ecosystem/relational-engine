@@ -18,7 +18,7 @@ Read it first, then this file, `../../tests/test-preferences.md`, current
 | R2 Responsibility Layout Law | Rust storage and C search | Module/layout owner checks; explicit unimplemented scope |
 | Stable Row and Variable Binding Law | Chunk/registry lifetimes and 32-byte ABI | Growth, layout, failure and C-client owner tests |
 | Fixed File Mapping Law | Rust fixed-extent file-backed byte views and lifetime | Unsafe external-file admission, checked ranges, borrow-negative and real file owners |
-| Growable File Mapping Law | Rust reservation-backed growing byte views | Specified, not implemented; growth/publication/free-list rules below |
+| Growable File Mapping Law | Rust reservation-backed growing byte views | Implemented with one C ABI; free-list reuse and Windows/Linux proof remain gaps |
 | Physical File Reservation Law | Rust create-new byte files | Real allocated-block proof, no sparse fallback, failure preservation and retained-descriptor transfer |
 
 ### Physical File Reservation Law
@@ -141,9 +141,17 @@ must be stated wherever this type is described.
    implicit sync (flush/sync stay explicit caller decisions), no typed
    reinterpretation, no concurrent writers, and page faults are unbounded waits that
    must stay off joined-worker bounded-teardown paths (the Bounded Wait Law).
-8. **Status: specified, not implemented.** No `GrowableMappedFile` source exists yet.
-   Until it does, no store may claim a growable mapping primitive; `FixedMappedFile`
-   is the only implemented mapping type and it cannot grow.
+8. **Status: implemented, with stated gaps.** `nio/growable_mapped_file.rs` owns the
+   reservation and the committed length, one `extern "C"` surface (`re_gmap_*`) reaches
+   it from C, and `io/preallocation.rs` gained `reserve_more` because the existing
+   `reserve` checks a whole extent and so cannot express an incremental step. The owner
+   tests assert the property the type exists for: a pointer taken before a growth step
+   is byte-identical after it, bytes survive growth, growth past the reservation and
+   backwards growth are refused, and a failed growth leaves both length and bytes
+   unchanged. Real allocation is *observed* through `st_blocks`, never assumed.
+   **Still missing:** the free-list reuse of released ranges (there is no release
+   operation yet, so the committed length only ratchets up), and Windows/Linux runtime
+   proof — the code path exists and rejects `Unsupported`, but has never run there.
 
 ### Stable Row and Variable Binding Law
 

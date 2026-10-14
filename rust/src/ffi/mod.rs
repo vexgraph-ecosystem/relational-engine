@@ -3,6 +3,7 @@ pub mod memory;
 pub mod variable_registry;
 pub mod row_pool;
 pub mod fixed_mapped_file;
+pub mod growable_mapped_file;
 pub use variable_registry::{re_variables_new, re_variables_drop, re_variables_add,
     re_variables_find, re_variables_slot, re_variables_set_pointer};
 // Preserve the original ffi::re_memory_* client paths.
