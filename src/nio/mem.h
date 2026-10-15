@@ -24,18 +24,21 @@
 // wrapper one, wrapper two, the BE6C sugar and the class number — so any
 // pointer names its own project and class without a registry lookup. `hash` is
 // the recomputed veto over (id, length, pointer); `length` is the payload's
-// byte count; `pointer` is the block's own payload address. A header therefore
-// validates three ways and fails closed on any of them: the BE6C sugar inside
-// the id, the hash over the stated fields, and the stored pointer equal to this
-// header's own payload address. Negative pointer math recovers the header in 1
-// subtraction; Memory_type() and Memory_length() are free O(1) reads with zero
-// locking. The header is frozen: no growth room lives here (struct evolution is
-// detected per object via length + refused at the manifest gate, never
-// accommodated in-band).
+// byte count; `pointer` is the redirect this block carries — the object's own
+// address, or the address of its value when the id's form says the type is a
+// primitive (`Type_isPrimitive` on the id word decides which; the id's BE6C
+// sugar is what makes the id trustworthy enough to ask). A header therefore
+// validates two ways and fails closed on either: the BE6C sugar inside the id,
+// and the hash over the stated fields. Provenance beyond that is the
+// arena-range gate, never a magic cookie. Negative pointer math recovers the
+// header in 1 subtraction; Memory_type() and Memory_length() are free O(1)
+// reads with zero locking. The header is frozen: no growth room lives here
+// (struct evolution is detected per object via length + refused at the manifest
+// gate, never accommodated in-band).
 //
-// The stored self-pointer is what makes blocks immovable: a block must never be
-// relocated after allocation or its header goes stale and fails closed. The
-// master arena mallocs its backing once and never moves a live block.
+// Blocks are immovable: `pointer` records an address, so a block must never be
+// relocated after allocation or that address goes stale. The master arena
+// mallocs its backing once and never moves a live block.
 
 #define MEMORY_HEADER_SIZE 32
 
@@ -43,7 +46,7 @@ typedef struct MemoryHeader {
     uint64_t typeId;   // triple-sugar self-describe id (BE6C sugar inside)
     uint64_t hash;     // recomputed veto over (typeId, length, pointer)
     uint64_t length;   // payload byte count
-    uint64_t pointer;  // this block's own payload address
+    uint64_t pointer;  // redirect: the object's address, or a primitive's value address
 } MemoryHeader;
 _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
 // 16-byte payload alignment holds by construction, not by attribute (this

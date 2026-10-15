@@ -48,13 +48,13 @@
  *     uint64_t typeId;  // triple-sugar self-describe id (BE6C sugar inside)
  *     uint64_t hash;    // recomputed veto over (typeId, length, pointer)
  *     uint64_t length;  // payload byte count
- *     uint64_t pointer; // this block's own payload address
+ *     uint64_t pointer; // redirect: the object's address, or a primitive's value
  *   }
  *   Zones: identity (id+length+pointer, stated), provenance (hash veto +
- *   pointer self-check + arena-range gate, no magic cookie), allocator (size
- *   class is a pure function of length — no stored index), future (none
- *   in-band; struct evolution is detected per object via length + refused at
- *   the manifest gate). The header is frozen at 32 Bytes, read backwards.
+ *   arena-range gate, no magic cookie), allocator (size class is a pure
+ *   function of length — no stored index), future (none in-band; struct
+ *   evolution is detected per object via length + refused at the manifest
+ *   gate). The header is frozen at 32 Bytes, read backwards.
  *   SlabClass {
  *     uint32_t slot_size;        // Bytes per slot in this size class
  *     uint32_t capacity;         // total slots carved from the arena
@@ -147,23 +147,23 @@ static uint64_t header_hash(uint64_t typeId, uint64_t length, uint64_t pointer) 
     return hash | 1ull;
 }
 
-/** Stamp a header: identity, length, its own payload address, and the veto. */
+/** Stamp a header: identity, length, the block's redirect, and the veto. */
 static void header_stamp(MemoryHeader *h, uint64_t typeId, size_t numBytes) {
     (*h).typeId = typeId;
     (*h).length = (uint64_t) numBytes;
+    // The redirect is the object's own address here; a primitive form redirects
+    // to its value cell instead, which the id's form bits decide (Type_isPrimitive).
     (*h).pointer = (uint64_t) (uintptr_t) ((uint8_t*) h + sizeof(MemoryHeader));
     (*h).hash = header_hash((*h).typeId, (*h).length, (*h).pointer);
 }
 
-// Triple sugar: BE6C lives inside the id word, the hash vetoes the stated
-// fields, and the stored pointer must be this header's own payload address —
-// which is what makes a live block immovable.
-/** Validate a header against its own fields and its own address. */
+// Triple sugar: BE6C inside the id word, the hash over the stated fields, and
+// the redirect the block carries. The hash vetoes the redirect's value without
+// constraining what it addresses, so an object and a primitive block are both
+// admissible and the id tells a reader which it is.
+/** Validate a header against its own stated fields. */
 static bool header_valid(const MemoryHeader *h) {
     if (!h)
-        return false;
-    if ((*h).pointer != (uint64_t) (uintptr_t)
-            ((const uint8_t*) h + sizeof(MemoryHeader)))
         return false;
     return (*h).hash == header_hash((*h).typeId, (*h).length, (*h).pointer);
 }
