@@ -19,13 +19,14 @@
  * ============================================================================
  * Pre-allocated Master Arena and Size-Class Slab Allocator fulfilling the
  * Vex Paradigm: zero steady-state malloc, cache-hot slot recycling, and
- * 16-byte negative pointer math. The 16-byte MemoryHeader (typeId, length,
- * sugar) is read backwards from the user pointer; the sugar is a
- * hash-clarification veto over (self, length) so cleared headers always fail
- * verification with no special case. Phase-4 instancing makes the globals the
- * default MemoryArena while secondaries register for address-range free
- * routing. Teardown is Memory_freeAll last, after every dependent subsystem
- * has released its blocks.
+ * 32-byte negative pointer math. The 32-byte MemoryHeader (id with sugar,
+ * hash, length, pointer) is read backwards from the user pointer; the hash is
+ * the recomputed veto over the stated fields and the stored pointer is the
+ * block's own payload address, so cleared headers always fail verification
+ * with no special case. Phase-4 instancing makes the globals the default
+ * MemoryArena while secondaries register for address-range free routing.
+ * Teardown is Memory_freeAll last, after every dependent subsystem has released
+ * its blocks.
  * ============================================================================
  */
 
@@ -36,7 +37,7 @@
  * ============================================================================
  * Pre-allocated Master Arena and Size-Class Slab Allocator fulfilling the
  * Vex Paradigm: zero steady-state malloc, cache-hot slot recycling, and
- * 16-byte negative pointer math.
+ * 32-byte negative pointer math.
  *
  * Phase-4 instancing: globals are the DEFAULT MemoryArena; secondaries
  * register for address-range free routing. Header layout untouched.
@@ -44,22 +45,16 @@
  * STRUCT FIELDS (Mirroring nio/mem.h + local to this file):
  * ----------------------------------------------------------------------------
  *   MemoryHeader {
- *     uint64_t typeId; // block-header self id (identity core)
- *     uint32_t length; // payload length (identity core)
- *     uint32_t sugar;  // hash-clarification veto over (self, length)
+ *     uint64_t typeId;  // triple-sugar self-describe id (BE6C sugar inside)
+ *     uint64_t hash;    // recomputed veto over (typeId, length, pointer)
+ *     uint64_t length;  // payload byte count
+ *     uint64_t pointer; // this block's own payload address
  *   }
- *   Zones: identity (self+length, stated), provenance (sugar veto +
- *   arena-range gate, no magic cookie), allocator (size class is a pure
- *   function of length — no stored index), future (none in-band; struct
- *   evolution is detected per object via length + refused at the manifest
- *   gate). The header is frozen at 16 Bytes, read backwards.
- *   Block {
- *     struct Block *prev; // instance state
- *     struct Block *next; // next sibling ref
- *     uint32_t typeId; // block-header type id
- *     uint32_t length; // payload length
- *     uint64_t pad; // alignment padding
- *   }
+ *   Zones: identity (id+length+pointer, stated), provenance (hash veto +
+ *   pointer self-check + arena-range gate, no magic cookie), allocator (size
+ *   class is a pure function of length — no stored index), future (none
+ *   in-band; struct evolution is detected per object via length + refused at
+ *   the manifest gate). The header is frozen at 32 Bytes, read backwards.
  *   SlabClass {
  *     uint32_t slot_size;        // Bytes per slot in this size class
  *     uint32_t capacity;         // total slots carved from the arena
@@ -106,10 +101,11 @@
  *   - MemoryArena_capacity(a)
  *
  * Transient Functions (Dynamic Lifetime Verifier):
- *   Scratch payload lengths fit uint32_t; an oversized or capacity-overflowing
- *   request is refused LOUDLY once per epoch (THROW) and counted thereafter,
- *   without changing headers, generation or bump cursor. Initialization
- *   capacity must round to 16-byte alignment without size_t overflow.
+ *   Scratch payload lengths fit the 64-bit header length; a request whose
+ *   header-plus-alignment arithmetic overflows, or that exceeds capacity, is
+ *   refused LOUDLY once per epoch (THROW) and counted thereafter, without
+ *   changing headers, generation or bump cursor. Initialization capacity must
+ *   round to 16-byte alignment without size_t overflow.
  *   - Memory_initTransient(capacity)
  *   - Transient_alloc(typeId, numBytes)
  *   - Transient_reset(void)
@@ -135,26 +131,41 @@
 ;;INTENTION("fixed SLAB_COUNT: allocator slab classes are a design constant, not a workload ceiling")
 #define ANTI_ARENA_DEFAULT_SIZE (64 * 1024 * 1024) // 64 MB master arena
 
-// Hash-clarification veto over the identity core, fed little-endian (never
-// serialized, but explicit anyway). LSB forced so a stored sugar is never 0:
+// Hash-clarification veto over the stated identity, fed little-endian (never
+// serialized, but explicit anyway). LSB forced so a stored hash is never 0:
 // cleared (zeroed) headers always fail verification with no special case.
-/** Compute the nonzero header check word from type id and payload length. */
-static uint32_t header_sugar(uint64_t typeId, uint32_t length) {
-    uint32_t hash = 2166136261u;
-    for (int i = 0; i < 8; i++) {
-        hash ^= (uint32_t) ((typeId >> (i * 8)) & 0xFFu);
-        hash *= 16777619u;
+/** Compute the nonzero header veto word from type id, length and payload address. */
+static uint64_t header_hash(uint64_t typeId, uint64_t length, uint64_t pointer) {
+    uint64_t hash = 1469598103934665603ull;
+    const uint64_t words[3] = { typeId, length, pointer };
+    for (int w = 0; w < 3; w++) {
+        for (int i = 0; i < 8; i++) {
+            hash ^= (words[w] >> (i * 8)) & 0xFFull;
+            hash *= 1099511628211ull;
+        }
     }
-    for (int i = 0; i < 4; i++) {
-        hash ^= (uint32_t) ((length >> (i * 8)) & 0xFFu);
-        hash *= 16777619u;
-    }
-    return hash | 1u;
+    return hash | 1ull;
 }
 
-/** Check a header's stored sugar against its identity and length fields. */
+/** Stamp a header: identity, length, its own payload address, and the veto. */
+static void header_stamp(MemoryHeader *h, uint64_t typeId, size_t numBytes) {
+    (*h).typeId = typeId;
+    (*h).length = (uint64_t) numBytes;
+    (*h).pointer = (uint64_t) (uintptr_t) ((uint8_t*) h + sizeof(MemoryHeader));
+    (*h).hash = header_hash((*h).typeId, (*h).length, (*h).pointer);
+}
+
+// Triple sugar: BE6C lives inside the id word, the hash vetoes the stated
+// fields, and the stored pointer must be this header's own payload address —
+// which is what makes a live block immovable.
+/** Validate a header against its own fields and its own address. */
 static bool header_valid(const MemoryHeader *h) {
-    return h && (*h).sugar == header_sugar((*h).typeId, (*h).length);
+    if (!h)
+        return false;
+    if ((*h).pointer != (uint64_t) (uintptr_t)
+            ((const uint8_t*) h + sizeof(MemoryHeader)))
+        return false;
+    return (*h).hash == header_hash((*h).typeId, (*h).length, (*h).pointer);
 }
 
 typedef struct FreeNode {
@@ -305,7 +316,7 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
         for (size_t i = (*slab).capacity; i > 0; i--) {
             uint8_t *slot_ptr = (*slab).arena + (i - 1) * sz;
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
-            (*h).sugar = 0;
+            memset(h, 0, sizeof(MemoryHeader));
             FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
             (*node).next = (*slab).free_head;
             (*slab).free_head = node;
@@ -330,12 +341,13 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
 static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
     if (!a || !(*a).live)
         return nullptr;
-    if (numBytes > UINT32_MAX) {
-        // A size the header can never describe is a refusal, not a silent no-op.
+    if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - 15u) {
+        // A size whose header-plus-alignment arithmetic overflows is a refusal,
+        // not a silent no-op.
         (*a).exhaustionCount++;
         if (!(*a).exhaustionReported) {
             (*a).exhaustionReported = true;
-            THROW("memory: request %zu exceeds the uint32 header limit", numBytes);
+            THROW("memory: request %zu overflows the block size", numBytes);
         }
         return nullptr;
     }
@@ -352,11 +364,8 @@ static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
         SpinLock_unlock(&(*slab).lock);
 
         if (node) {
-            uint8_t *slot_ptr = (uint8_t*) node - sizeof(MemoryHeader);
-            MemoryHeader *h = (MemoryHeader*) slot_ptr;
-            (*h).typeId = typeId;
-            (*h).length = (uint32_t) numBytes;
-            (*h).sugar = header_sugar(typeId, (uint32_t) numBytes);
+            MemoryHeader *h = (MemoryHeader*) ((uint8_t*) node - sizeof(MemoryHeader));
+            header_stamp(h, typeId, numBytes);
             return (void*) node;
         }
     }
@@ -371,9 +380,7 @@ static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
         SpinLock_unlock(&(*a).bumpLock);
 
         MemoryHeader *h = (MemoryHeader*) slot_ptr;
-        (*h).typeId = typeId;
-        (*h).length = (uint32_t) numBytes;
-        (*h).sugar = header_sugar(typeId, (uint32_t) numBytes);
+        header_stamp(h, typeId, numBytes);
         return (void*) (slot_ptr + sizeof(MemoryHeader));
     }
     SpinLock_unlock(&(*a).bumpLock);
@@ -431,7 +438,7 @@ static void arena_free(MemoryArena *a, void *userPtr) {
             break;
         }
     }
-    (*h).sugar = 0;
+    memset(h, 0, sizeof(MemoryHeader));
     if (!slab)
         return; // Bump storage is reclaimed wholesale only.
     FreeNode *node = (FreeNode*) userPtr;
@@ -459,7 +466,7 @@ static void arena_freeAll(MemoryArena *a) {
         for (size_t i = (*slab).capacity; i > 0; i--) {
             uint8_t *slot_ptr = (*slab).arena + (i - 1) * sz;
             MemoryHeader *h = (MemoryHeader*) slot_ptr;
-            (*h).sugar = 0;
+            memset(h, 0, sizeof(MemoryHeader));
             FreeNode *node = (FreeNode*) (slot_ptr + sizeof(MemoryHeader));
             (*node).next = (*slab).free_head;
             (*slab).free_head = node;
@@ -554,7 +561,7 @@ bool Memory_init(size_t totalBytes) {
     return arena_init(&s_default, totalBytes);
 }
 
-/** Allocate a default-arena payload with a 16-byte self-describing header. */
+/** Allocate a default-arena payload with a 32-byte self-describing header. */
 void *Memory_alloc(uint64_t typeId, size_t numBytes) {
     ensure_initialized();
     return arena_alloc(&s_default, typeId, numBytes);
@@ -673,13 +680,14 @@ static inline void ensure_transient_initialized(void) {
 
 /** Allocate an aligned transient payload, rejecting length, arithmetic, and capacity overflow. */
 void *Transient_alloc(uint64_t typeId, size_t numBytes) {
-    // The header length is uint32_t. An oversized request is a refusal and is
-    // reported (once per epoch) rather than dropped; the guard stays cheap.
-    if (numBytes > UINT32_MAX || numBytes > SIZE_MAX - sizeof(MemoryHeader) - 15u) {
+    // The header length is 64-bit; only arithmetic overflow is refused. An
+    // oversized request is a refusal and is reported (once per epoch) rather
+    // than dropped; the guard stays cheap.
+    if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - 15u) {
         s_transient.exhaustionCount++;
         if (!s_transient.exhaustionReported) {
             s_transient.exhaustionReported = true;
-            THROW("transient: request %zu exceeds the scratch length limit", numBytes);
+            THROW("transient: request %zu overflows the scratch block size", numBytes);
         }
         return nullptr;
     }
@@ -709,9 +717,7 @@ void *Transient_alloc(uint64_t typeId, size_t numBytes) {
     SpinLock_unlock(&s_transient.lock);
 
     MemoryHeader *h = (MemoryHeader*) slot;
-    (*h).typeId = typeId;
-    (*h).length = (uint32_t) numBytes;
-    (*h).sugar = header_sugar(typeId, (uint32_t) numBytes);
+    header_stamp(h, typeId, numBytes);
 
     return (void*) (slot + sizeof(MemoryHeader));
 }
