@@ -5,7 +5,7 @@
 //! API: new/copy_bytes/get/get_byte; new/get/set_atomic_byte;
 //! new/get/set_atomic_string; release/clear/len/is_empty.
 //! Registration/release/clear need exclusive ownership; atomic get/set share &self.
-//! Rejection preserves content. Kind tags are internal, NOT ecosystem type IDs.
+//! Rejection preserves content. Kind tags are internal, NOT vexgraph-ecosystem-gitrepo type IDs.
 //! Atomic Bytes publish with release/acquire. Strings retain immutable snapshots.
 use crate::annotation::overview;
 use std::sync::atomic::{AtomicU8, Ordering};

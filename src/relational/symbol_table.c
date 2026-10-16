@@ -73,7 +73,7 @@
  *   - SymbolTable_getId(v, name)
  *   - SymbolTable_getPointer(v, varId)
  *   - SymbolTable_getClassId(v, varId)
- *   - SymbolTable_getName(v, varId, out, outCap)
+ *   - SymbolTable_getName(v, varId)
  *   - SymbolTable_getActiveCount(v)
  * ============================================================================
  */
@@ -332,19 +332,13 @@ uint32_t SymbolTable_getClassId(SymbolTable *v, int32_t varId) {
     return row ? (*row).classId : 0;
 }
 
-// Copy a row's pooled name to out when its full NUL-terminated form fits.
-int SymbolTable_getName(SymbolTable *v, int32_t varId, char *out, size_t outCap) {
-    SymbolRow *row = row_at(v, varId);
-    if (!row || !out)
-        return -1;
+// Borrow the registered name from the shared string pool.
+const char *SymbolTable_getName(const SymbolTable *v, int32_t varId) {
+    const SymbolRow *row = row_at((const SymbolTable*) v, varId);
+    if (!row)
+        return nullptr;
     const char *name = StringPool_name((uint32_t) (*row).slot);
-    if (!name)
-        return -1;
-    size_t len = strlen(name);
-    if (outCap < len + 1)
-        return -1;
-    memcpy(out, name, len + 1);
-    return (int)len;
+    return name;
 }
 
 // Return the number of registered rows, or zero for an inactive registry.

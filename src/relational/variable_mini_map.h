@@ -46,8 +46,9 @@ void VariableMiniMap_free(VariableMiniMap *map);
 // Insert or update name => pointer (the additive verb). Folds + validates the
 // name; rejected names and OOM yield false and leave the map untouched.
 bool VariableMiniMap_add(VariableMiniMap *map, const char *name, uintptr_t pointer);
-// Resolve a name (dest-last; found flag returned).
-bool VariableMiniMap_get(const VariableMiniMap *map, const char *name, uintptr_t *outPointer);
+// Resolve a name and return its value. Zero means absent/invalid; use contains
+// when a stored zero value must be distinguished from a miss.
+uintptr_t VariableMiniMap_get(const VariableMiniMap *map, const char *name);
 // Pure probe (silent on miss).
 bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name);
 

@@ -44,7 +44,7 @@ bool Variable_check(const Variable *self, uint64_t typeId);
 void *Variable_read(Variable *self, void *arg);
 
 bool Variable_setName(Variable *self, const char *name);
-int Variable_getName(const Variable *self, char *out, size_t outCap);
+int Variable_getName(char *out, size_t outCap, const Variable *self);
 void Variable_setRead(Variable *self, VariableReadFn read);
 VariableReadFn Variable_getRead(const Variable *self);
 void Variable_setTarget(Variable *self, void *target);

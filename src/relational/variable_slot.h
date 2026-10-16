@@ -75,9 +75,8 @@ bool VariableSlot_setName(VariableSlot *self, const char *name);
 void VariableSlot_setPointer(VariableSlot *self, uintptr_t pointer);
 
 // --- Getters (null-safe) ---
-// Copy the folded name into out (NUL-terminated, at most outCap Bytes). Returns
-// the name length, or -1 on a null slot / null out / short buffer.
-int VariableSlot_getName(const VariableSlot *self, char *out, size_t outCap);
+// Borrow the folded name from this slot; returns nullptr for a null slot.
+const char *VariableSlot_getName(const VariableSlot *self);
 uintptr_t VariableSlot_getPointer(const VariableSlot *self);
 bool VariableSlot_isEmpty(const VariableSlot *self);
 // True when the folded name equals the folded form of name.

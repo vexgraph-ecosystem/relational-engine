@@ -11,7 +11,7 @@
 //! must also exclude raw-pointer users before remove, release or destruction.
 //! Raw usize locations are reusable, NOT identities; the generation-tagged Handle
 //! surface is the identity API (a reused slot rejects its earlier handle). No
-//! registered ecosystem type ID, concurrent allocator or C ABI yet.
+//! registered vexgraph-ecosystem-gitrepo type ID, concurrent allocator or C ABI yet.
 use crate::annotation::overview;
 use crate::nio::{handle::Handle, typed_chunk::{TypedChunk, TYPED_CHUNK_ROWS_DEFAULT}, storage_error::StorageError, projection};
 

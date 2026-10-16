@@ -53,7 +53,7 @@
  * Public Constructors: (.h) Class_0() .. _3(name, layout, construct), _init, _free
  * Public Core Functions: (.h) Class_kind, _check, _construct, _addMethod, _getMethod, _forEachMethod
  * Public Setters: (.h) Class_setName / _setLayout / _setConstruct
- * Public Getters: (.h) Class_getName / _getLayout / _getConstruct / _methodCount
+ * Public Getters: (.h) Class_getName(out, cap, self) / _getLayout / _getConstruct / _methodCount
  * Public String Projections: (.h) Class_toString / _toStringStruct
  * ============================================================================
  */
@@ -221,7 +221,7 @@ ClassConstructFn Class_getConstruct(const Class *self) {
 }
 
 // Copy the folded class name when the complete NUL-terminated value fits.
-int Class_getName(const Class *self, char *out, size_t outCap) {
+int Class_getName(char *out, size_t outCap, const Class *self) {
     if (self == nullptr || out == nullptr || outCap == 0u)
         return -1;
     const char *src = (*self).name;

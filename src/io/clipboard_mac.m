@@ -13,7 +13,7 @@
  * Native NSPasteboard bridge supporting UTF-8 text and raw RGBA8 bitmaps:
  * Clipboard_getText copies into a caller-owned buffer (truncation-safe),
  * Clipboard_getImage decodes TIFF/PNG pasteboard data into caller-owned
- * pixel memory with dest-last width/height outputs, and Clipboard_setImage
+ * pixel memory with outputs-first width/height outputs, and Clipboard_setImage
  * encodes RGBA8 through NSBitmapImageRep. Zero engine allocation — all
  * buffers are the caller's. This is the L4 platform seam; Linux/Wayland
  * builds provide a sibling implementation of the same io/clipboard.h
@@ -44,7 +44,7 @@
  *   - Clipboard_hasImage(void)
  *   - Clipboard_getText(dest, maxBytes)
  *   - Clipboard_setText(text)
- *   - Clipboard_getImage(dest, maxBytes, outWidth, outHeight)
+ *   - Clipboard_getImage(outWidth, outHeight, dest, maxBytes)
  *   - Clipboard_setImage(pixels, width, height)
  *   - Clipboard_clear(void)
  * ============================================================================
@@ -117,7 +117,7 @@ bool Clipboard_setText(const char *text) {
 }
 
 /** Decode pasteboard TIFF/PNG into caller RGBA storage when it fits, then return dimensions. */
-bool Clipboard_getImage(void *dest, size_t maxBytes, int32_t *outWidth, int32_t *outHeight) {
+bool Clipboard_getImage(int32_t *outWidth, int32_t *outHeight, void *dest, size_t maxBytes) {
     if (dest == nullptr || outWidth == nullptr || outHeight == nullptr) {
         return false;
     }

@@ -11,7 +11,8 @@ does not change its R2 rank. This is a partial backend, not a finished engine.
 
 **Implemented and proven (macOS arm64):**
 - Migrated production native C IO/NIO: `Memory`/`MemoryArena`/`Transient` (16-byte
-  header arena) and `File`/`Cache`/`Log`/`VexHome`/`ProcessSpawn`/`WsClient` plus
+  header arena) and `File`/`Cache`/`Log`/`VexHome`/`ProcessSpawn` plus a bounded
+  caller-fed `FrameInbox` (not a WebSocket client) and
   the macOS clipboard adapter.
 - Rust `primitives` byte/string with atomic byte and retained immutable string
   snapshots over a standalone C ABI; stable `Chunk`/`ChunkedList`,

@@ -48,7 +48,7 @@
  * Public Constructors: (.h) Method_0() .. _3(name, invoke, target), _init, _free
  * Public Core Functions: (.h) Method_kind, _check, _call
  * Public Setters: (.h) Method_setName / _setInvoke / _setTarget
- * Public Getters: (.h) Method_getName / _getInvoke / _getTarget
+ * Public Getters: (.h) Method_getName(out, cap, self) / _getInvoke / _getTarget
  * Public String Projections: (.h) Method_toString / _toStringStruct
  * ============================================================================
  */
@@ -155,7 +155,7 @@ void Method_setTarget(Method *self, void *target) {
 
 // GETTERS
 
-int Method_getName(const Method *self, char *out, size_t outCap) {
+int Method_getName(char *out, size_t outCap, const Method *self) {
     if (self == nullptr || out == nullptr || outCap == 0u)
         return -1;
     const char *src = (*self).name;

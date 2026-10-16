@@ -2,7 +2,7 @@
 //! OVERVIEW: repr(C) fields owner u64, index usize, generation u32, reserved u32.
 //! Zero is invalid. owner distinguishes pools, including after destruction/recreation.
 //! API: new/zero/owner/index/generation/is_zero/to_string/to_string_struct.
-//! reserved must be zero. This record is not a pointer, ecosystem type ID or disk ID.
+//! reserved must be zero. This record is not a pointer, vexgraph-ecosystem-gitrepo type ID or disk ID.
 use crate::annotation::overview;
 use super::projection;
 

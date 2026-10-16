@@ -64,7 +64,7 @@
  *
  * Public Core Functions: (.h)
  *   - VariableMiniMap_add(map, name, pointer)
- *   - VariableMiniMap_get(map, name, outPointer)
+ *   - VariableMiniMap_get(map, name): resolve to a returned pointer value
  *   - VariableMiniMap_contains(map, name)
  *   - VariableMiniMap_forEach(map, fn, userdata)
  *
@@ -173,10 +173,27 @@ bool VariableMiniMap_add(VariableMiniMap *map, const char *name, uintptr_t point
     return true;
 }
 
-// Find name and optionally write its pointer value; clear output before lookup.
-bool VariableMiniMap_get(const VariableMiniMap *map, const char *name, uintptr_t *outPointer) {
-    if (outPointer)
-        *outPointer = 0u;
+// Find name and return its pointer value, or zero on miss.
+uintptr_t VariableMiniMap_get(const VariableMiniMap *map, const char *name) {
+    if (!map || !(*map).active)
+        return 0u;
+    char folded[VARIABLE_SLOT_NAME_BYTES];
+    if (!VariableSlot_foldName(name, folded))
+        return 0u;
+    int bucket = VariableSlot_bucketOf(folded[0]);
+    if (bucket < 0)
+        return 0u;
+    ChunkedList *list = (*map).buckets[bucket];
+    if (!list)
+        return 0u;
+    VariableSlot *row = findRow(list, name);
+    if (!row)
+        return 0u;
+    return VariableSlot_getPointer(row);
+}
+
+// Report whether name resolves to an entry in the mini map.
+bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name) {
     if (!map || !(*map).active)
         return false;
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -186,19 +203,7 @@ bool VariableMiniMap_get(const VariableMiniMap *map, const char *name, uintptr_t
     if (bucket < 0)
         return false;
     ChunkedList *list = (*map).buckets[bucket];
-    if (!list)
-        return false;
-    VariableSlot *row = findRow(list, name);
-    if (!row)
-        return false;
-    if (outPointer)
-        *outPointer = VariableSlot_getPointer(row);
-    return true;
-}
-
-// Report whether name resolves to an entry in the mini map.
-bool VariableMiniMap_contains(const VariableMiniMap *map, const char *name) {
-    return VariableMiniMap_get(map, name, nullptr);
+    return list && findRow(list, name) != nullptr;
 }
 
 // Visit each stored slot with the caller's context.

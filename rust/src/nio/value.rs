@@ -1,4 +1,4 @@
-//! Internal storage kind, separate from ecosystem type IDs.
+//! Internal storage kind, separate from vexgraph-ecosystem-gitrepo type IDs.
 use crate::annotation::overview;
 use std::sync::atomic::AtomicU8;
 use crate::primitives::atomic_string::AtomicString;

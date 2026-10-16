@@ -46,7 +46,7 @@
  * Public Constructors: (.h) Field_0() .. _4(name, read, set, target), _init, _free
  * Public Core Functions: (.h) Field_kind, _check, _getVariable, _read, _write
  * Public Setters: (.h) Field_setName / _setRead / _setSet / _setTarget
- * Public Getters: (.h) Field_getName / _getRead / _getSet / _getTarget
+ * Public Getters: (.h) Field_getName(out, cap, self) / _getRead / _getSet / _getTarget
  * Public String Projections: (.h) Field_toString / _toStringStruct
  * ============================================================================
  */
@@ -173,11 +173,11 @@ void Field_setTarget(Field *self, void *target) {
 
 // GETTERS
 
-int Field_getName(const Field *self, char *out, size_t outCap) {
+int Field_getName(char *out, size_t outCap, const Field *self) {
     if (self == nullptr)
         return -1;
     const Variable *variable = &(*self).variable;
-    return Variable_getName(variable, out, outCap);
+    return Variable_getName(out, outCap, variable);
 }
 
 // Return the embedded reader callback, or nullptr for a null Field.

@@ -68,7 +68,7 @@
 int32_t Relational_getId(SymbolTable *scope, const char *name);
 
 // Name accessors for search/rename. varId must be valid.
-int Relational_getName(SymbolTable *scope, int32_t varId, char *out, size_t outCap);
+const char *Relational_getName(const SymbolTable *scope, int32_t varId);
 bool Relational_setName(SymbolTable *scope, const char *oldName, const char *newName);
 
 // Value accessors — store as-is, no copy. classId describes the pointer type.

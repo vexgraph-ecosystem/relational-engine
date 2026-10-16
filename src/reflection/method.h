@@ -43,7 +43,7 @@ bool Method_check(const Method *self, uint64_t typeId);
 void *Method_call(Method *self, void *arg);
 
 bool Method_setName(Method *self, const char *name);
-int Method_getName(const Method *self, char *out, size_t outCap);
+int Method_getName(char *out, size_t outCap, const Method *self);
 void Method_setInvoke(Method *self, MethodFn invoke);
 MethodFn Method_getInvoke(const Method *self);
 void Method_setTarget(Method *self, void *target);

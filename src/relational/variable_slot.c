@@ -78,7 +78,7 @@
  *   - VariableSlot_setPointer(self, pointer)
  *
  * Public Getters: (.h)
- *   - VariableSlot_getName(self, out, outCap)
+ *   - VariableSlot_getName(self)
  *   - VariableSlot_getPointer(self)
  *   - VariableSlot_isEmpty(self)
  *   - VariableSlot_nameEquals(self, name)
@@ -214,15 +214,8 @@ void VariableSlot_setPointer(VariableSlot *self, uintptr_t pointer) {
 
 // GETTERS (PUBLIC & PRIVATE)
 
-int VariableSlot_getName(const VariableSlot *self, char *out, size_t outCap) {
-    if (self == nullptr || out == nullptr || outCap == 0)
-        return -1;
-    const char *src = (*self).name;
-    size_t len = strlen(src);
-    if (len + 1 > outCap)
-        return -1;
-    memcpy(out, src, len + 1);
-    return (int) len;
+const char *VariableSlot_getName(const VariableSlot *self) {
+    return self ? (*self).name : nullptr;
 }
 
 // Return the stored value pointer, or zero for a null slot.

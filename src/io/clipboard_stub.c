@@ -40,7 +40,7 @@
  *   - Clipboard_hasText(void)                    : true when text is stored
  *   - Clipboard_hasImage(void)                   : always false (no pasteboard)
  *   - Clipboard_getText(dest, maxBytes)          : copy stored text, Bytes written
- *   - Clipboard_getImage(dest, maxBytes, outWidth, outHeight) : always false
+ *   - Clipboard_getImage(outWidth, outHeight, dest, maxBytes) : always false
  *
  * Setters:
  *   - Clipboard_setText(text)                    : store text (truncated at 4095)
@@ -82,7 +82,7 @@ bool Clipboard_setText(const char *text) {
 }
 
 /** Report that image retrieval is unsupported by the non-Apple clipboard stub. */
-bool Clipboard_getImage(void *dest, size_t maxBytes, int32_t *outWidth, int32_t *outHeight) {
+bool Clipboard_getImage(int32_t *outWidth, int32_t *outHeight, void *dest, size_t maxBytes) {
     (void) dest; (void) maxBytes; (void) outWidth; (void) outHeight;
     return false;
 }

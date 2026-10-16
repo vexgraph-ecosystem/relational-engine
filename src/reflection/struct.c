@@ -49,7 +49,7 @@
  * Public Constructors: (.h) Struct_0(), Struct_1(name), _init, _free
  * Public Core Functions: (.h) Struct_kind, _check, _add, _get, _forEach
  * Public Setters: (.h) Struct_setName
- * Public Getters: (.h) Struct_getName, _count, _isEmpty
+ * Public Getters: (.h) Struct_getName(out, cap, self), _count, _isEmpty
  * Public String Projections: (.h) Struct_toString / _toStringStruct
  * ============================================================================
  */
@@ -172,7 +172,7 @@ bool Struct_setName(Struct *self, const char *name) {
 
 // GETTERS
 
-int Struct_getName(const Struct *self, char *out, size_t outCap) {
+int Struct_getName(char *out, size_t outCap, const Struct *self) {
     if (self == nullptr || out == nullptr || outCap == 0u)
         return -1;
     const char *src = (*self).name;

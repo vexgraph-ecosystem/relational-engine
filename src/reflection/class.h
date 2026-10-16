@@ -62,7 +62,7 @@ typedef void (*ClassMethodVisitFn)(Method *method, uint32_t index, void *userdat
 void Class_forEachMethod(Class *self, ClassMethodVisitFn fn, void *userdata);
 
 bool Class_setName(Class *self, const char *name);
-int Class_getName(const Class *self, char *out, size_t outCap);
+int Class_getName(char *out, size_t outCap, const Class *self);
 
 void Class_toString(const Class *self, char *dest, size_t cap, bool *outTruncated);
 void Class_toStringStruct(const Class *self, char *dest, size_t cap, bool *outTruncated);

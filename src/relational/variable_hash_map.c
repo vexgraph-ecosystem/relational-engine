@@ -78,7 +78,7 @@
  *
  * Public Core Functions: (.h)
  *   - VariableHashMap_add(map, name, pointer)   : insert or update
- *   - VariableHashMap_get(map, name, outPointer): resolve (dest-last, found flag)
+ *   - VariableHashMap_get(map, name): resolve to a returned pointer value
  *   - VariableHashMap_contains(map, name)       : probe (silent miss)
  *   - VariableHashMap_forEach(map, fn, userdata): cold iteration
  *
@@ -224,10 +224,29 @@ bool VariableHashMap_add(VariableHashMap *map, const char *name, uintptr_t point
     return true;
 }
 
-// Find name and optionally write its pointer value; clear output before lookup.
-bool VariableHashMap_get(const VariableHashMap *map, const char *name, uintptr_t *outPointer) {
-    if (outPointer)
-        *outPointer = 0u;
+// Find name and return its pointer value, or zero on miss.
+uintptr_t VariableHashMap_get(const VariableHashMap *map, const char *name) {
+    if (!map || !(*map).active)
+        return 0u;
+    char folded[VARIABLE_SLOT_NAME_BYTES];
+    uint32_t bucket = 0u;
+    uint32_t slot = 0u;
+    if (!locate(name, &bucket, &slot, folded))
+        return 0u;
+    ChunkedList **band = (*map).bands[bucket];
+    if (!band)
+        return 0u;
+    ChunkedList *list = band[slot];
+    if (!list)
+        return 0u;
+    VariableSlot *row = findRow(list, name);
+    if (!row)
+        return 0u;
+    return VariableSlot_getPointer(row);
+}
+
+// Report whether name resolves to an entry in the map.
+bool VariableHashMap_contains(const VariableHashMap *map, const char *name) {
     if (!map || !(*map).active)
         return false;
     char folded[VARIABLE_SLOT_NAME_BYTES];
@@ -236,22 +255,7 @@ bool VariableHashMap_get(const VariableHashMap *map, const char *name, uintptr_t
     if (!locate(name, &bucket, &slot, folded))
         return false;
     ChunkedList **band = (*map).bands[bucket];
-    if (!band)
-        return false;
-    ChunkedList *list = band[slot];
-    if (!list)
-        return false;
-    VariableSlot *row = findRow(list, name);
-    if (!row)
-        return false;
-    if (outPointer)
-        *outPointer = VariableSlot_getPointer(row);
-    return true;
-}
-
-// Report whether name resolves to an entry in the map.
-bool VariableHashMap_contains(const VariableHashMap *map, const char *name) {
-    return VariableHashMap_get(map, name, nullptr);
+    return band && band[slot] && findRow(band[slot], name) != nullptr;
 }
 
 // Visit each stored slot with the caller's context.

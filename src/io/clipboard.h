@@ -34,8 +34,8 @@ size_t Clipboard_getText(char *dest, size_t maxBytes);
 bool   Clipboard_setText(const char *text);
 
 // Read raw RGBA8 image pixels from clipboard.
-// Dest-last order: writes width, height, and pixel Bytes into caller buffer.
-bool   Clipboard_getImage(void *dest, size_t maxBytes, int32_t *outWidth, int32_t *outHeight);
+// Outputs-first: writes dimensions and pixel Bytes into caller storage.
+bool   Clipboard_getImage(int32_t *outWidth, int32_t *outHeight, void *dest, size_t maxBytes);
 
 // Write raw RGBA8 image pixels to clipboard.
 bool   Clipboard_setImage(const void *pixels, int32_t width, int32_t height);

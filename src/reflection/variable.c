@@ -48,7 +48,7 @@
  * Public Constructors: (.h) Variable_0() .. _3(name, read, target), _init, _free
  * Public Core Functions: (.h) Variable_kind, _check, _read
  * Public Setters: (.h) Variable_setName / _setRead / _setTarget
- * Public Getters: (.h) Variable_getName / _getRead / _getTarget
+ * Public Getters: (.h) Variable_getName(out, cap, self) / _getRead / _getTarget
  * Public String Projections: (.h) Variable_toString / _toStringStruct
  * ============================================================================
  */
@@ -155,7 +155,7 @@ void Variable_setTarget(Variable *self, void *target) {
 
 // GETTERS
 
-int Variable_getName(const Variable *self, char *out, size_t outCap) {
+int Variable_getName(char *out, size_t outCap, const Variable *self) {
     if (self == nullptr || out == nullptr || outCap == 0u)
         return -1;
     const char *src = (*self).name;

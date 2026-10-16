@@ -72,9 +72,9 @@ void VariableHashMap_free(VariableHashMap *map);
 // rejection). Growing a slot never moves an existing row.
 bool VariableHashMap_add(VariableHashMap *map, const char *name, uintptr_t pointer);
 
-// Resolve a name (dest-last, found flag returned). On true, *outPointer holds
-// the value; on false, *outPointer is 0 and the name is absent (or invalid).
-bool VariableHashMap_get(const VariableHashMap *map, const char *name, uintptr_t *outPointer);
+// Resolve a name and return its value. Zero means absent/invalid; use contains
+// when a stored zero value must be distinguished from a miss.
+uintptr_t VariableHashMap_get(const VariableHashMap *map, const char *name);
 
 // True when the name resolves. Pure probe — silent on miss (never logs).
 bool VariableHashMap_contains(const VariableHashMap *map, const char *name);

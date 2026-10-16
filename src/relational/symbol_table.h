@@ -80,7 +80,7 @@ uint32_t SymbolTable_getClassId(SymbolTable *v, int32_t varId);
 
 // Copy the registered name into _out (nul-terminated, at most outCap Bytes).
 // Returns the string length, or -1 on bad varId / short buffer.
-int SymbolTable_getName(SymbolTable *v, int32_t varId, char *out, size_t outCap);
+const char *SymbolTable_getName(const SymbolTable *v, int32_t varId);
 
 // Number of registered symbols.
 size_t SymbolTable_getActiveCount(SymbolTable *v);

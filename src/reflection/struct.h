@@ -47,7 +47,7 @@ typedef void (*StructVisitFn)(Field *field, uint32_t index, void *userdata);
 void Struct_forEach(Struct *self, StructVisitFn fn, void *userdata);
 
 bool Struct_setName(Struct *self, const char *name);
-int Struct_getName(const Struct *self, char *out, size_t outCap);
+int Struct_getName(char *out, size_t outCap, const Struct *self);
 uint32_t Struct_count(const Struct *self);
 bool Struct_isEmpty(const Struct *self);
 
