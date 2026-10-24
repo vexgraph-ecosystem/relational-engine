@@ -221,7 +221,7 @@ static bool registry_push(MemoryArena *a) {
     if (s_registryCount == s_registryCap) {
         size_t newCap = (s_registryCap == 0) ? 8 : s_registryCap * 2;
         MemoryArena **nb = (MemoryArena**) realloc(
-            s_registry, newCap * sizeof(MemoryArena *));
+            s_registry, newCap * sizeof(MemoryArena*));
         if (!nb) return false;
         s_registry = nb;
         s_registryCap = newCap;
