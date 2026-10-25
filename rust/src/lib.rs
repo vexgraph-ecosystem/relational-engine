@@ -8,20 +8,13 @@
 //! # Ok::<(), relational_engine_scratchpad::MemoryError>(())
 //! ```
 pub mod annotation;
-#[overview]
 pub mod nio;
 pub mod primitives;
 pub mod io;
 pub mod compress;
-#[overview]
 pub mod variable;
-#[overview]
 pub mod r#struct;
 pub mod r#virtual;
-use crate::annotation::{intention, overview};
-
-#[overview]
-#[intention("the marker vocabulary; the same set as the C ;;annotations")]
 pub mod text;
 pub mod ffi;
 // Preserve existing short client paths while exposing organized modules.
