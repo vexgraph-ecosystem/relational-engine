@@ -42,6 +42,13 @@
 
 #define MEMORY_HEADER_SIZE 32
 
+// The ecosystem payload floor (Universal Alignment Law): every block the three
+// arenas hand out is 32-byte aligned on every supported platform. Consumers may
+// assert a type against it; a type that needs more than this is not allocated
+// directly here.
+#define MEMORY_PAYLOAD_ALIGN 32u
+_Static_assert(MEMORY_PAYLOAD_ALIGN == 32, "the payload floor is 32 bytes");
+
 typedef struct MemoryHeader {
     uint64_t typeId;   // triple-sugar self-describe id (BE6C sugar inside)
     uint64_t hash;     // recomputed veto over (typeId, length, pointer)
@@ -49,11 +56,17 @@ typedef struct MemoryHeader {
     uint64_t pointer;  // redirect: the object's address, or a primitive's value address
 } MemoryHeader;
 _Static_assert(sizeof(MemoryHeader) == 32, "MemoryHeader must stay 32 Bytes");
-// 16-byte payload alignment holds by construction, not by attribute (this
-// toolchain's _Alignas rejects typedef application): master/slab arenas come
-// from malloc (16-aligned on arm64 macOS), every slot size and bump total is a
-// multiple of 16, so every payload pointer satisfies (u & 15) == 0 as mem.c
-// guards.
+// 32-byte payload alignment is the ecosystem floor (the Universal Alignment
+// Law), and it holds by construction, not by attribute (this toolchain's
+// _Alignas rejects typedef application): the arenas over-allocate one unit and
+// round their base forward to 32, every slot size and bump stride is a multiple
+// of 32, and mem.c guards every release with (u & 31) == 0. malloc alone would
+// not be enough: Windows x64/arm64 and macOS arm64 promise 16, so the 32 is
+// built here, on every platform, not inherited from the platform's allocator.
+// The header is 32 bytes, so a 32-aligned payload implies a 32-aligned block
+// start. A type whose _Alignof exceeds 32 is not arena-allocated directly: it is
+// embedded in a 32-aligned owner or lives in a typed owner with construction-time
+// geometry (RowPool/RowChunk), whose alignment is a caller-chosen floor of 32.
 
 // Initialize the master arena with a specific total capacity (e.g. 64MB).
 // If not called explicitly, Memory_alloc initializes a 64MB arena lazily.

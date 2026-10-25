@@ -196,19 +196,23 @@ were examples of logic errors that Rust can compile without complaint.
 
 ## 7. The data model (the pieces)
 
-### 7.1 The 16-byte block header
+### 7.1 The 32-byte block header
 
-The native C `Memory_*` allocation contract uses a 16-byte header:
+The native C `Memory_*` allocation contract uses a 32-byte header:
 
 ```
-[ typeId: u64 ][ length: u32 ][ sugar: u32 ]   then the payload bytes
+[ id: u64 (BE6C sugar) ][ hash: u64 ][ length: u64 ][ pointer: u64 ]   then the payload bytes
 ```
 
-The payload pointer sits 16 bytes after the header, so the header is found by one
-subtraction. `typeId` says what it is; `length` says how big; `sugar` is a
-recognizable marker. This is allocation metadata, not permission to inspect an
-arbitrary address. The separate Rust `Memory` and typed pools do **not** implement
-this header ABI; moving native C files into RE did not rewrite them in Rust.
+The payload pointer sits 32 bytes after the header, so the header is found by one
+subtraction. The id names the project and class, the hash vetoes a corrupted or
+forged header, `length` says how big, and `pointer` is the redirect the block
+carries. The header is frozen at four words: no growth room lives in-band. This is
+allocation metadata, not permission to inspect an arbitrary address. Payloads are
+32-byte aligned on every supported platform (the Universal Alignment Law), and
+since the header is also 32 bytes, a block's own start is aligned with its payload.
+The separate Rust `Memory` and typed pools do **not** implement this header ABI;
+moving native C files into RE did not rewrite them in Rust.
 
 ### 7.2 Memory (`Memory`) — the byte store
 
@@ -308,7 +312,7 @@ own class registry. This lets one allocator serve every type across the whole st
 ```
 R2 relational engine -- separate contracts
 
-  Native C Memory_*: existing allocator + 16-byte header
+  Native C Memory_*: existing allocator + 32-byte header
   Rust Memory: byte blocks + atomic values, separate opaque C ABI
   Rust TypedPool: reusable typed rows + owner-local handles (Rust API)
   Rust RowPool: aligned byte rows + owner-tagged handles (C and Rust API)
@@ -362,7 +366,7 @@ Honest pressure points, so you can push on them:
 3. **Indices vs handles.** Keeping both raw indices and handles is pragmatic but
    leaves a footgun. If you want identity everywhere, the raw index API could be
    demoted to `pub(crate)`.
-4. **One header, one truth.** The 16-byte block header lives with the allocator; the
+4. **One header, one truth.** The 32-byte block header lives with the allocator; the
    type algebra lives in `src/type`. They are related but separate — worth deciding
    whether the header should carry more self-description.
 5. **Mapping is a choice, not a readiness badge.** Rust FixedMappedFile now implements
@@ -430,7 +434,7 @@ record verbatim would save a process address, not a portable health value.
   names.
 - **`repr(C)`** — "lay this out exactly like C would".
 - **opaque handle** — a pointer C holds but never dereferences itself.
-- **block header** — the 16 bytes before every payload (`typeId`/`length`/`sugar`).
+- **block header** — the 32 bytes before every payload (`id`/`hash`/`length`/`pointer`).
 - **stable row** — a stored element whose address never changes while it lives.
 - **generation** — a counter bumped when a slot is freed, so old handles go stale.
 - **Handle** — `{ index, generation }`: a location plus its identity.

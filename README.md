@@ -10,8 +10,8 @@ does not change its R2 rank. This is a partial backend, not a finished engine.
 **Role:** R2 memory/storage owner. A partial backend, not a finished engine.
 
 **Implemented and proven (macOS arm64):**
-- Migrated production native C IO/NIO: `Memory`/`MemoryArena`/`Transient` (16-byte
-  header arena) and `File`/`Cache`/`Log`/`VexHome`/`ProcessSpawn` plus a bounded
+- Migrated production native C IO/NIO: `Memory`/`MemoryArena`/`Transient` (32-byte
+  header arena, 32-byte payload floor) and `File`/`Cache`/`Log`/`VexHome`/`ProcessSpawn` plus a bounded
   caller-fed `FrameInbox` (not a WebSocket client) and
   the macOS clipboard adapter.
 - Rust `primitives` byte/string with atomic byte and retained immutable string
@@ -65,8 +65,9 @@ imported C comparison files do not prove standalone runtime dependency closure.
 Production IO/NIO ownership has migrated: the default allocator and file/cache/
 log/transport implementations now live in this engine's `src/nio` and `src/io`.
 Vexspoke contains no copies. Canonical includes and the default workspace build
-resolve this engine-owned C ABI. Native allocation semantics and 16-byte headers
-are preserved, not rewritten into Rust. Broader Rust/container migration remains
+resolve this engine-owned C ABI. Native allocation semantics and 32-byte headers
+are preserved, not rewritten into Rust. Payloads are 32-byte aligned on every
+supported platform (the Universal Alignment Law). Broader Rust/container migration remains
 staged. R3 may borrow either R2 public contract. R1 owns
 lifetimes/residency and excludes active users before destruction. GPU shaders,
 dispatch, capabilities and synchronization remain Graphvex R3. No C/Rust
@@ -77,7 +78,7 @@ atomic-layout compatibility or automatic record-schema migration is assumed.
 This is a boundary decision, not a taste one — and it is the question every reader
 asks, so it is answered here once.
 
-**The ABI is already C, and it is wide.** `Memory_*`, `File`, `VexHome`, the 16-byte
+**The ABI is already C, and it is wide.** `Memory_*`, `File`, `VexHome`, the 32-byte
 block header, the project-scoped type algebra and the legacy per-project type ids are
 consumed by *every* tier: R1 `hotcwap`, the R3 drivers, R4 interfaces and R5 apps all
 link the C ABI. The constitution is explicit that native allocation semantics and the

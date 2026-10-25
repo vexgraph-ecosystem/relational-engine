@@ -65,8 +65,9 @@
  *   }
  *   MemoryArena {
  *     SlabClass slabs[SLAB_COUNT]; // size-class slab table (64B..4K)
- *     uint8_t *masterArena;      // pre-allocated master backing store
- *     size_t masterCapacity;     // master arena byte capacity
+ *     uint8_t *masterArena;      // 32-aligned base the slabs are carved from
+ *     uint8_t *masterRaw;        // allocation to release (rounded base +31)
+ *     size_t masterCapacity;     // usable master bytes after the rounding
  *     uint8_t *bumpArena;        // large/allocation bump region
  *     size_t bumpCapacity;       // bump region capacity
  *     size_t bumpOffset;         // bump cursor (monotonic)
@@ -105,7 +106,7 @@
  *   header-plus-alignment arithmetic overflows, or that exceeds capacity, is
  *   refused LOUDLY once per epoch (THROW) and counted thereafter, without
  *   changing headers, generation or bump cursor. Initialization capacity must
- *   round to 16-byte alignment without size_t overflow.
+ *   round to the 32-byte payload floor without size_t overflow.
  *   - Memory_initTransient(capacity)
  *   - Transient_alloc(typeId, numBytes)
  *   - Transient_reset(void)
@@ -130,6 +131,18 @@
 #define SLAB_COUNT 7
 ;;INTENTION("fixed SLAB_COUNT: allocator slab classes are a design constant, not a workload ceiling")
 #define ANTI_ARENA_DEFAULT_SIZE (64 * 1024 * 1024) // 64 MB master arena
+
+// The payload floor (MEMORY_PAYLOAD_ALIGN, declared in mem.h) is CONSTRUCTED,
+// never inherited: malloc promises 16 on Windows x64/arm64 and macOS arm64, so
+// each arena over-allocates one unit and rounds its base forward, and every
+// slot size and stride is a multiple of 32. The 32-byte header then sits 32
+// bytes behind a 32-byte payload, so a block's own start is aligned too.
+#define MEMORY_ALIGN_MASK (MEMORY_PAYLOAD_ALIGN - 1u)
+
+/** Round a freshly allocated base forward to the payload floor. */
+static inline uint8_t *align_up(uint8_t *raw) {
+    return (uint8_t*) (((uintptr_t) raw + MEMORY_ALIGN_MASK) & ~(uintptr_t) MEMORY_ALIGN_MASK);
+}
 
 // Hash-clarification veto over the stated identity, fed little-endian (never
 // serialized, but explicit anyway). LSB forced so a stored hash is never 0:
@@ -183,8 +196,9 @@ typedef struct SlabClass {
 
 struct MemoryArena {
     SlabClass slabs[SLAB_COUNT];
-    uint8_t *masterArena;
-    size_t masterCapacity;
+    uint8_t *masterArena;      // 32-aligned base the slabs are carved from
+    uint8_t *masterRaw;        // allocation to release (may sit up to 31B below)
+    size_t masterCapacity;     // usable master bytes after the rounding
     uint8_t *bumpArena;
     size_t bumpCapacity;
     size_t bumpOffset;
@@ -240,7 +254,8 @@ static bool registry_ensureDefault(void) {
 #define ANTI_TRANSIENT_DEFAULT_SIZE (64 * 1024 * 1024) // 64 MB
 
 typedef struct TransientArena {
-    uint8_t *buffer;
+    uint8_t *buffer;    // 32-aligned scratch base
+    uint8_t *raw;       // allocation to release (buffer is rounded forward)
     size_t capacity;
     size_t bumpOffset;
     uint32_t generation;
@@ -296,17 +311,23 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
     (*a).live = false;
 
     size_t cap = totalBytes > 0 ? totalBytes : ANTI_ARENA_DEFAULT_SIZE;
-    uint8_t *master = (uint8_t*) malloc(cap);
-    if (!master)
+    if (cap > SIZE_MAX - (MEMORY_ALIGN_MASK + MEMORY_PAYLOAD_ALIGN))
         return false;
+    size_t alignedCap = (cap + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
+    // Over-allocate one alignment unit so the base can be rounded forward; the
+    // raw pointer is what release frees, the rounded one is the arena origin.
+    uint8_t *raw = (uint8_t*) malloc(alignedCap + MEMORY_PAYLOAD_ALIGN);
+    if (!raw)
+        return false;
+    uint8_t *master = align_up(raw);
 
     uint8_t *cur = master;
-    size_t left = cap;
+    size_t left = alignedCap;
     for (size_t s = 0; s < SLAB_COUNT; s++) {
         SlabClass *slab = &(*a).slabs[s];
         size_t need = (size_t)(*slab).capacity * (*slab).slot_size;
         if (need > left) {
-            free(master);
+            free(raw);
             return false;
         }
         (*slab).arena = cur;
@@ -326,7 +347,8 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
     }
 
     (*a).masterArena = master;
-    (*a).masterCapacity = cap;
+    (*a).masterRaw = raw;
+    (*a).masterCapacity = alignedCap;
     (*a).bumpArena = cur;
     (*a).bumpCapacity = left;
     (*a).bumpOffset = 0;
@@ -341,7 +363,7 @@ static bool arena_init(MemoryArena *a, size_t totalBytes) {
 static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
     if (!a || !(*a).live)
         return nullptr;
-    if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - 15u) {
+    if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
         // A size whose header-plus-alignment arithmetic overflows is a refusal,
         // not a silent no-op.
         (*a).exhaustionCount++;
@@ -370,7 +392,7 @@ static void *arena_alloc(MemoryArena *a, uint64_t typeId, size_t numBytes) {
         }
     }
 
-    size_t aligned_len = (numBytes + 15) & ~15ull;
+    size_t aligned_len = (numBytes + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
     size_t total = sizeof(MemoryHeader) + aligned_len;
 
     SpinLock_lock(&(*a).bumpLock);
@@ -402,13 +424,13 @@ static void arena_free(MemoryArena *a, void *userPtr) {
         return;
 
     uintptr_t u = (uintptr_t) userPtr;
-    if (u < sizeof(MemoryHeader) || (u & 15) != 0)
+    if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return;
 
     // Validate the pointer is within this arena's known address range before
     // performing the negative-offset header read.  MemoryArena_free calls us
     // directly (bypassing safe_header / arena_for), so a foreign pointer that
-    // happens to be aligned would otherwise blindly dereference p-16, which
+    // happens to be aligned would otherwise blindly dereference p-32, which
     // can SIGSEGV when those Bytes are in an unmapped page.
     uint8_t *p = (uint8_t*) userPtr;
     bool in_range = false;
@@ -492,7 +514,7 @@ static MemoryArena *arena_for(void *userPtr) {
     if (!userPtr)
         return nullptr;
     uintptr_t u = (uintptr_t) userPtr;
-    if (u < sizeof(MemoryHeader) || (u & 15) != 0)
+    if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return nullptr;
 
     uint8_t *p = (uint8_t*) userPtr;
@@ -516,7 +538,7 @@ static const MemoryHeader *safe_header(const void *userPtr) {
     if (!userPtr)
         return nullptr;
     uintptr_t u = (uintptr_t) userPtr;
-    if (u < sizeof(MemoryHeader) || (u & 15) != 0)
+    if (u < sizeof(MemoryHeader) || (u & MEMORY_ALIGN_MASK) != 0)
         return nullptr;
 
     uint8_t *p = (uint8_t*) userPtr;
@@ -643,9 +665,9 @@ bool Memory_similar(const void *a, const void *b) {
     return (*ha).typeId == (*hb).typeId;
 }
 
-/** Initialize the transient bump arena once, rounding capacity up to 16-byte alignment. */
+/** Initialize the transient bump arena once, rounding capacity up to the payload floor. */
 bool Memory_initTransient(size_t capacity) {
-    if (capacity > SIZE_MAX - 15u)
+    if (capacity > SIZE_MAX - (MEMORY_ALIGN_MASK + MEMORY_PAYLOAD_ALIGN))
         return false;
     SpinLock_lock(&s_transient.lock);
     if (s_transient.live) {
@@ -655,13 +677,15 @@ bool Memory_initTransient(size_t capacity) {
     if (capacity == 0)
         capacity = ANTI_TRANSIENT_DEFAULT_SIZE;
 
-    size_t aligned_cap = (capacity + 15) & ~15ull;
-    s_transient.buffer = (uint8_t*) malloc(aligned_cap);
-    if (!s_transient.buffer) {
+    size_t aligned_cap = (capacity + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
+    uint8_t *raw = (uint8_t*) malloc(aligned_cap + MEMORY_PAYLOAD_ALIGN);
+    if (!raw) {
         SpinLock_unlock(&s_transient.lock);
         return false;
     }
 
+    s_transient.raw = raw;
+    s_transient.buffer = align_up(raw);
     s_transient.capacity = aligned_cap;
     s_transient.bumpOffset = 0;
     s_transient.generation = 1;
@@ -683,7 +707,7 @@ void *Transient_alloc(uint64_t typeId, size_t numBytes) {
     // The header length is 64-bit; only arithmetic overflow is refused. An
     // oversized request is a refusal and is reported (once per epoch) rather
     // than dropped; the guard stays cheap.
-    if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - 15u) {
+    if (numBytes > SIZE_MAX - sizeof(MemoryHeader) - MEMORY_ALIGN_MASK) {
         s_transient.exhaustionCount++;
         if (!s_transient.exhaustionReported) {
             s_transient.exhaustionReported = true;
@@ -695,7 +719,7 @@ void *Transient_alloc(uint64_t typeId, size_t numBytes) {
     if (!s_transient.live)
         return nullptr;
 
-    size_t aligned_len = (numBytes + 15) & ~15ull;
+    size_t aligned_len = (numBytes + MEMORY_ALIGN_MASK) & ~(size_t) MEMORY_ALIGN_MASK;
     size_t total = sizeof(MemoryHeader) + aligned_len;
 
     SpinLock_lock(&s_transient.lock);
@@ -800,7 +824,7 @@ MemoryArena *MemoryArena_create(size_t totalBytes) {
     bool placed = registry_push(a);
     SpinLock_unlock(&s_registryLock);
     if (!placed) {
-        free((*a).masterArena);
+        free((*a).masterRaw);
         free(a);
         return nullptr;
     }
@@ -820,8 +844,11 @@ void MemoryArena_destroy(MemoryArena *a) {
     }
     SpinLock_unlock(&s_registryLock);
     (*a).live = false;
-    free((*a).masterArena);
+    free((*a).masterRaw);
+    (*a).masterRaw = nullptr;
     (*a).masterArena = nullptr;
+    (*a).bumpArena = nullptr;
+    (*a).masterCapacity = 0;
     free(a);
 }
 
@@ -898,7 +925,7 @@ size_t MemoryArena_findAll(MemoryArena *a, uint64_t typeId, void **outArray, siz
         if (remaining < sizeof(MemoryHeader))
             break;
         size_t length = (*h).length;
-        size_t total = sizeof(MemoryHeader) + ((length + 15u) & ~15ull);
+        size_t total = sizeof(MemoryHeader) + ((length + MEMORY_ALIGN_MASK) & ~(uint64_t) MEMORY_ALIGN_MASK);
         if (total > remaining)
             break;
         if (header_valid(h) && (typeId == 0 || (*h).typeId == typeId)) {
