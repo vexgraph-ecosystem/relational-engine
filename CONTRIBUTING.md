@@ -2,7 +2,7 @@
 
 Read the complete [workspace preferences.md constitution](https://gist.github.com/vex-graph/4132a6c45cb6d3797c3e8eff2e94035a)
 before work. In the integrated workspace it is the real workspace-root
-`../../gist/PREFERENCES.md`, not a file to duplicate in this repository.
+`../../../metadata/gists/preferences/gist.md`; read relevant laws with `./tools/prefs`.
 
 The Git Workflow Law, Feature Implementation and Adversarial Proof Law,
 Living Documentation Law and Test Segregation Law apply. Preserve imported
@@ -15,7 +15,7 @@ Use b/native compiler tooling for actual work; do not compile out real diagnosti
 Read [relational-engine-preferences.md](relational-engine-preferences.md) for
 the resident storage, atomic boundary and one-type-per-file contracts.
 Public scratchpad code is not battle-tested readiness. Owner tests live in the
-independent workspace `../../tests/relational-engine` checkout; generated binaries,
+workspace `../../../tests/relational-engine` tree; generated binaries,
 Cargo target output and IDE state stay ignored.
 
 This repository belongs to [vexgraph-ecosystem](https://github.com/vexgraph-ecosystem/relational-engine)

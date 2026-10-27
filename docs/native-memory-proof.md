@@ -61,7 +61,7 @@ python3 tests/relational-engine/native_run.py --owner mem_exhaustion_test --mode
 
 The main runner covers optimized strict, release-like (no DEBUG_BORROW_CHECK)
 and ASan/UBSan builds with assertions enabled. Exact commands/results/hashes live
-in `../../../gist/test-checklist.md`; a runner's presence is not execution evidence.
+in `../../../metadata/gists/test-checklist.md`; a runner's presence is not execution evidence.
 
 ## Not yet proved
 
