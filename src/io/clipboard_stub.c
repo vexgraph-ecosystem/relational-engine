@@ -1,11 +1,12 @@
 #include "io/clipboard.h"
+#include "platform/platform.h"
 // Production R2 I/O owner: Relational Engine; existing Clipboard ABI preserved.
 #include <string.h>
 
 #include "annotation/definition.h"
 #include "annotation/overview.h"
 
-#if !defined(__APPLE__)
+#if !defined(VEX_PLATFORM_APPLE)
 
 ;;DEFINITION
 /**
@@ -19,7 +20,7 @@
  * no OS pasteboard to exchange pixels with. Zero allocation, zero threads,
  * zero steady-state cost — the stub exists so R4/R5 callers compile and run
  * on Linux/Windows while the macOS NSPasteboard implementation carries the
- * real bridge. The whole file is compiled out under __APPLE__.
+ * real bridge. The whole file is compiled out under VEX_PLATFORM_APPLE.
  * ============================================================================
  */
 
