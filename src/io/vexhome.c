@@ -1,4 +1,5 @@
 #include "io/vexhome.h"
+#include "platform/platform.h"
 // Production R2 I/O owner: Relational Engine; existing VexHome ABI preserved.
 
 #include <stdio.h>
@@ -36,8 +37,8 @@
  *
  * Root resolution precedence (implemented in resolve_base):
  *   1. $VEX_HOME (non-empty) — documented test seam, overrides everything
- *   2. macOS (__APPLE__): $HOME/Library/Application Support/vexgraph
- *   3. Windows (_WIN32): %LOCALAPPDATA%\vexgraph (fallback %USERPROFILE%\vexgraph)
+ *   2. macOS (VEX_PLATFORM_APPLE): $HOME/Library/Application Support/vexgraph
+ *   3. Windows (VEX_PLATFORM_WINDOWS): %LOCALAPPDATA%\vexgraph (fallback %USERPROFILE%\vexgraph)
  *   4. Linux/other: $XDG_DATA_HOME/vexgraph (fallback $HOME/.local/share/vexgraph)
  *   5. Final fallback: $HOME/vex  (ROOT_NAME "vex" used only for this fallback)
  *
@@ -107,10 +108,10 @@ static void resolve_base(char *out) {
     if (!home || *home == '\0')
         home = ".";
 
-#if defined(__APPLE__)
+#if defined(VEX_PLATFORM_APPLE)
     // 2. macOS: ~/Library/Application Support/vexgraph
     snprintf(out, FILE_PATH_MAX, "%s/Library/Application Support/vexgraph", home);
-#elif defined(_WIN32)
+#elif defined(VEX_PLATFORM_WINDOWS)
     // 3. Windows: %LOCALAPPDATA%\vexgraph (fallback %USERPROFILE%\vexgraph)
     const char *localappdata = getenv("LOCALAPPDATA");
     if (localappdata && *localappdata != '\0') {
